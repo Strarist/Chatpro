@@ -3,12 +3,22 @@ import { useState } from "react";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
 
-const MessageBubble = ({ message, onRegenerate, onEdit }) => {
+const MessageBubble = ({
+  message,
+  onEdit,
+  onRegenerate,
+  versionIndex = 0,
+  totalVersions = 1,
+  onPrev,
+  onNext,
+}) => {
   const [copied, setCopied] = useState(false);
 
   if (!message) return null;
 
   const isUser = message.role === "user";
+  const showVersionNav =
+    !isUser && totalVersions > 1 && typeof onPrev === "function" && typeof onNext === "function";
 
   // ✅ Copy handler
   const handleCopy = async () => {
@@ -112,6 +122,32 @@ const MessageBubble = ({ message, onRegenerate, onEdit }) => {
                 <span className="inline-block ml-1">
                   <span className="inline-block w-[2px] h-[1em] bg-white animate-pulse align-middle rounded-sm" />
                 </span>
+              )}
+
+              {showVersionNav && (
+                <div className="mt-3 flex items-center justify-end gap-2 text-xs text-gray-300">
+                  <button
+                    type="button"
+                    disabled={versionIndex <= 0}
+                    onClick={onPrev}
+                    className="px-2 py-0.5 rounded border border-gray-500 hover:bg-gray-600 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                    aria-label="Previous version"
+                  >
+                    ◀
+                  </button>
+                  <span className="tabular-nums text-gray-400">
+                    {versionIndex + 1} / {totalVersions}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={versionIndex >= totalVersions - 1}
+                    onClick={onNext}
+                    className="px-2 py-0.5 rounded border border-gray-500 hover:bg-gray-600 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                    aria-label="Next version"
+                  >
+                    ▶
+                  </button>
+                </div>
               )}
             </>
           )}

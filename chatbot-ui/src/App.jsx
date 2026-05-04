@@ -23,7 +23,7 @@ function App() {
       const saved = localStorage.getItem("chats");
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
+        if (Array.isArray(parsed)) {
           return parsed;
         }
       }
@@ -31,7 +31,7 @@ function App() {
       console.error("Failed to parse chats:", err);
     }
 
-    return [createDefaultChat()];
+    return [];
   });
 
   // =========================
@@ -43,9 +43,11 @@ function App() {
   });
 
   // =========================
-  // 🧠 DERIVE ACTIVE CHAT (NO EFFECT NEEDED)
+  // 🧠 DERIVE ACTIVE CHAT
   // =========================
   const activeChat = useMemo(() => {
+    if (!chats.length) return null;
+
     const found = chats.find((c) => c.id === activeChatId);
     return found || chats[0];
   }, [chats, activeChatId]);
@@ -70,6 +72,8 @@ function App() {
   // 📝 UPDATE MESSAGES
   // =========================
   const updateMessages = (newMessages) => {
+    if (!activeChat) return;
+
     setChats((prev) =>
       prev.map((chat) => {
         if (chat.id !== activeChat.id) return chat;
@@ -119,12 +123,11 @@ function App() {
       const updated = prev.filter((chat) => chat.id !== id);
 
       if (!updated.length) {
-        const fallback = createDefaultChat();
-        setActiveChatId(fallback.id);
-        return [fallback];
+        setActiveChatId(null);
+        return [];
       }
 
-      if (id === activeChat.id) {
+      if (id === activeChatId) {
         setActiveChatId(updated[0].id);
       }
 
@@ -145,14 +148,25 @@ function App() {
       />
 
       {/* Chat Window */}
-      <div className="flex-1">
-        {activeChat && (
+      <div className="flex-1 flex flex-col">
+
+        {activeChat ? (
           <ChatWindow
             key={activeChat.id}
             messages={activeChat.messages}
             setMessages={updateMessages}
           />
+        ) : (
+          <div className="flex-1 flex items-center justify-center text-gray-400">
+            <div className="text-center">
+              <h2 className="text-lg mb-2">No chats yet</h2>
+              <p className="text-sm">
+                Click “New Chat” to start a conversation
+              </p>
+            </div>
+          </div>
         )}
+
       </div>
 
     </div>

@@ -1,7 +1,6 @@
 import MessageBubble from "./MessageBubble";
 import InputBox from "./InputBox";
 import { useEffect, useRef, useState } from "react";
-import { motion } from "framer-motion";
 import { streamAIResponse } from "../services/aiService";
 
 const ChatWindow = ({ messages = [], setMessages }) => {
@@ -34,6 +33,12 @@ const ChatWindow = ({ messages = [], setMessages }) => {
     });
   }, [messages]);
 
+  const [activeVersionMap, setActiveVersionMap] = useState({});
+
+  const generateId = () => {
+    return "msg_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8);
+  };
+
   // =========================
   // 🚀 SEND MESSAGE
   // =========================
@@ -47,16 +52,20 @@ const ChatWindow = ({ messages = [], setMessages }) => {
     // ✅ EDIT MODE
     if (editingIndex !== null) {
       updatedMessages = messages.slice(0, editingIndex + 1);
-  
+
+      const existingUser = messages[editingIndex];
       updatedMessages[editingIndex] = {
+        ...existingUser,
+        id: existingUser?.id ?? generateId(),
         role: "user",
         content,
       };
-  
+
       setEditingIndex(null);
     } else {
-      // ✅ NORMAL FLOW
-      updatedMessages = [...messages, { role: "user", content }];
+      // ✅ NORMAL FLOW (stable id for assistant parentId / versions)
+      const userId = generateId();
+      updatedMessages = [...messages, { id: userId, role: "user", content }];
     }
   
     setMessages(updatedMessages);
@@ -68,7 +77,13 @@ const ChatWindow = ({ messages = [], setMessages }) => {
       // ✅ Add assistant placeholder
       setMessages((prev) => [
         ...prev,
-        { role: "assistant", content: "", isStreaming: true },
+        {
+          id: generateId(),
+          role: "assistant",
+          content: "",
+          isStreaming: true,
+          parentId: updatedMessages[updatedMessages.length - 1]?.id || null,
+        },
       ]);
   
       await streamAIResponse(
@@ -156,83 +171,94 @@ const ChatWindow = ({ messages = [], setMessages }) => {
   // =========================
   const regenerateResponse = async () => {
     if (isLoading) return;
-    const requestId = activeRequestIdRef.current + 1;
-    activeRequestIdRef.current = requestId;
   
     controllerRef.current?.abort();
   
-    // ✅ Remove LAST assistant only
-    let trimmed = [...messages];
+    // ✅ DO NOT remove old assistant messages
+    const baseMessages = [...messages];
   
-    while (
-      trimmed.length &&
-      trimmed[trimmed.length - 1].role === "assistant"
-    ) {
-      trimmed.pop();
-    }
+    // find last user message
+    const lastUserIndex = [...baseMessages]
+      .reverse()
+      .findIndex((m) => m.role === "user");
   
-    setMessages(trimmed);
+    if (lastUserIndex === -1) return;
+  
+    const realIndex = baseMessages.length - 1 - lastUserIndex;
+    const lastUser = baseMessages[realIndex];
   
     setIsLoading(true);
   
     try {
       controllerRef.current = new AbortController();
   
-      // Add assistant placeholder
+      // ✅ Create NEW assistant message (branch)
+      const newAssistantId = generateId();
+      const parentKey =
+        lastUser.id != null ? lastUser.id : `__user_slot_${realIndex}`;
+
       setMessages((prev) => [
         ...prev,
-        { role: "assistant", content: "", isStreaming: true },
+        {
+          id: newAssistantId,
+          role: "assistant",
+          content: "",
+          isStreaming: true,
+          parentId: parentKey,
+        },
       ]);
+
+      setActiveVersionMap((prev) => ({
+        ...prev,
+        [parentKey]: newAssistantId,
+      }));
   
       await streamAIResponse(
-        trimmed, // ✅ NO NEW USER MESSAGE
+        baseMessages,
         (incomingText) => {
-          if (
-            !isMountedRef.current ||
-            requestId !== activeRequestIdRef.current
-          ) {
-            return;
-          }
           setMessages((prev) => {
             const updated = [...prev];
-            if (!updated.length) return updated;
+  
             updated[updated.length - 1] = {
               ...updated[updated.length - 1],
               content: incomingText,
               isStreaming: true,
             };
+  
             return updated;
           });
         },
         controllerRef.current
       );
   
+      // finish streaming
       setMessages((prev) => {
         const updated = [...prev];
-        if (!updated.length) return updated;
-        updated[updated.length - 1] = {
-          ...updated[updated.length - 1],
-          isStreaming: false,
-        };
+        updated[updated.length - 1].isStreaming = false;
         return updated;
       });
   
-    } catch (err) {
-      if (err.name !== "AbortError") {
-        setMessages((prev) => [
-          ...prev,
-          { role: "assistant", content: "⚠️ Error generating response" },
-        ]);
-      }
     } finally {
-      if (isMountedRef.current && requestId === activeRequestIdRef.current) {
-        setIsLoading(false);
-      }
-      if (controllerRef.current?.signal?.aborted || requestId === activeRequestIdRef.current) {
-        controllerRef.current = null;
-      }
+      setIsLoading(false);
     }
   };
+
+  const getVersions = (messages) => {
+    const map = {};
+  
+    messages.forEach((msg) => {
+      if (msg.role === "assistant" && msg.parentId) {
+        if (!map[msg.parentId]) {
+          map[msg.parentId] = [];
+        }
+        map[msg.parentId].push(msg);
+      }
+    });
+  
+    return map;
+  };
+  
+  const versionMap = getVersions(messages);
 
   return (
     <div className="flex flex-col h-full items-center">
@@ -243,21 +269,75 @@ const ChatWindow = ({ messages = [], setMessages }) => {
         className="w-full max-w-3xl flex-1 overflow-y-auto px-4 py-6 space-y-6"
       >
         {messages.map((msg, i) => {
-          const isLast = i === messages.length - 1;
-
-          return (
-            <motion.div
-              key={i}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.2 }}
-            >
+          if (msg.role === "user") {
+            return (
               <MessageBubble
-                message={{ ...msg, isLast }}
-                onRegenerate={regenerateResponse}
+                key={msg.id ?? `user-${i}`}
+                message={msg}
                 onEdit={() => handleEdit(i)}
               />
-            </motion.div>
+            );
+          }
+
+          // Assistant: no parentId → show as-is (legacy / welcome / error bubbles)
+          if (!msg.parentId) {
+            return (
+              <MessageBubble
+                key={msg.id ?? `assistant-${i}`}
+                message={msg}
+                onRegenerate={regenerateResponse}
+              />
+            );
+          }
+
+          const siblings = versionMap[msg.parentId] || [];
+          if (!siblings.length) {
+            return (
+              <MessageBubble
+                key={msg.id ?? `assistant-${i}`}
+                message={msg}
+                onRegenerate={regenerateResponse}
+              />
+            );
+          }
+
+          const latest = siblings[siblings.length - 1];
+          const mappedId = activeVersionMap[msg.parentId];
+          const activeId =
+            mappedId && siblings.some((s) => s.id === mappedId)
+              ? mappedId
+              : latest?.id;
+          if (!activeId || msg.id !== activeId) return null;
+
+          const currentIndex = Math.max(
+            0,
+            siblings.findIndex((s) => s.id === activeId)
+          );
+
+          return (
+            <MessageBubble
+              key={msg.id ?? `assistant-${i}`}
+              message={msg}
+              onRegenerate={regenerateResponse}
+              versionIndex={currentIndex}
+              totalVersions={siblings.length}
+              onPrev={() => {
+                if (currentIndex > 0) {
+                  setActiveVersionMap((prev) => ({
+                    ...prev,
+                    [msg.parentId]: siblings[currentIndex - 1].id,
+                  }));
+                }
+              }}
+              onNext={() => {
+                if (currentIndex < siblings.length - 1) {
+                  setActiveVersionMap((prev) => ({
+                    ...prev,
+                    [msg.parentId]: siblings[currentIndex + 1].id,
+                  }));
+                }
+              }}
+            />
           );
         })}
       </div>

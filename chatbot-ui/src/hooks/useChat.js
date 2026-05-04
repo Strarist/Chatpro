@@ -6,12 +6,23 @@ export const useChat = () => {
     { role: "assistant", content: "Hi! Ask me anything." },
   ]);
 
+  const generateId = () => {
+    return "msg_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8);
+  };
+
   const [isLoading, setIsLoading] = useState(false);
 
   const sendMessage = async (content) => {
     if (!content.trim() || isLoading) return;
 
-    const userMsg = { role: "user", content };
+    const userMsg = {
+      id: generateId(),
+      role: "user",
+      content,
+      parentId: messages.length
+        ? messages[messages.length - 1].id
+        : null,
+    };
     setMessages((prev) => [...prev, userMsg]);
 
     setIsLoading(true);
