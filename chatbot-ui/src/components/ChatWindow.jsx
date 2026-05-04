@@ -6,6 +6,8 @@ import { streamAIResponse } from "../services/aiService";
 const ChatWindow = ({ messages = [], setMessages }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [editingIndex, setEditingIndex] = useState(null);
+  const [editingText, setEditingText] = useState("");
+  const [input, setInput] = useState("");
 
   const containerRef = useRef(null);
   const controllerRef = useRef(null);
@@ -48,26 +50,27 @@ const ChatWindow = ({ messages = [], setMessages }) => {
     activeRequestIdRef.current = requestId;
   
     let updatedMessages;
-  
-    // ✅ EDIT MODE
-    if (editingIndex !== null) {
-      updatedMessages = messages.slice(0, editingIndex + 1);
+    const editIdx = editingIndex;
 
-      const existingUser = messages[editingIndex];
-      updatedMessages[editingIndex] = {
-        ...existingUser,
-        id: existingUser?.id ?? generateId(),
-        role: "user",
-        content,
-      };
-
-      setEditingIndex(null);
-    } else {
-      // ✅ NORMAL FLOW (stable id for assistant parentId / versions)
+    // ✅ EDIT & RESEND: drop edited message + everything after, then new user turn
+    if (editIdx !== null) {
+      const trimmed = messages.slice(0, editIdx);
       const userId = generateId();
-      updatedMessages = [...messages, { id: userId, role: "user", content }];
+      updatedMessages = [
+        ...trimmed,
+        { id: userId, role: "user", content: content.trim() },
+      ];
+      setEditingIndex(null);
+      setEditingText("");
+      setActiveVersionMap({});
+    } else {
+      const userId = generateId();
+      updatedMessages = [
+        ...messages,
+        { id: userId, role: "user", content: content.trim() },
+      ];
     }
-  
+
     setMessages(updatedMessages);
     setIsLoading(true);
   
@@ -162,8 +165,9 @@ const ChatWindow = ({ messages = [], setMessages }) => {
   // =========================
   // ✏️ START EDIT
   // =========================
-  const handleEdit = (index) => {
+  const handleEdit = (index, text) => {
     setEditingIndex(index);
+    setEditingText(text ?? "");
   };
 
   // =========================
@@ -274,7 +278,7 @@ const ChatWindow = ({ messages = [], setMessages }) => {
               <MessageBubble
                 key={msg.id ?? `user-${i}`}
                 message={msg}
-                onEdit={() => handleEdit(i)}
+                onEdit={() => handleEdit(i, msg.content)}
               />
             );
           }
@@ -345,14 +349,15 @@ const ChatWindow = ({ messages = [], setMessages }) => {
       {/* Input */}
       <div className="w-full max-w-3xl px-4 pb-6">
       <InputBox
-  key={editingIndex ?? -1}
-  onSend={sendMessage}
-  onStop={stopGeneration}
-  isLoading={isLoading}
-  initialValue={
-    editingIndex !== null ? messages[editingIndex]?.content : ""
-  }
-/>
+        value={editingIndex !== null ? editingText : input}
+        setValue={(val) => {
+          if (editingIndex !== null) setEditingText(val);
+          else setInput(val);
+        }}
+        onSend={sendMessage}
+        onStop={stopGeneration}
+        isLoading={isLoading}
+      />
       </div>
     </div>
   );

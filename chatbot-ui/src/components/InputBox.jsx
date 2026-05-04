@@ -1,7 +1,6 @@
-import { useState, useRef, useEffect } from "react";
+import { useRef, useEffect } from "react";
 
-const InputBox = ({ onSend, onStop, isLoading, initialValue = "" }) => {
-  const [input, setInput] = useState(initialValue);
+const InputBox = ({ value, setValue, onSend, onStop, isLoading }) => {
   const textareaRef = useRef(null);
 
   // =========================
@@ -26,16 +25,16 @@ const InputBox = ({ onSend, onStop, isLoading, initialValue = "" }) => {
 
   useEffect(() => {
     autoResize();
-  }, [input]);
+  }, [value]);
 
   // =========================
   // 🚀 SEND MESSAGE
   // =========================
   const handleSend = () => {
-    if (!input.trim() || isLoading) return;
+    if (!value.trim() || isLoading) return;
 
-    onSend(input);
-    setInput("");
+    onSend(value);
+    setValue("");
 
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
@@ -58,9 +57,9 @@ const InputBox = ({ onSend, onStop, isLoading, initialValue = "" }) => {
       {/* Textarea */}
       <textarea
         ref={textareaRef}
-        value={input}
+        value={value}
         onChange={(e) => {
-          setInput(e.target.value);
+          setValue(e.target.value);
           autoResize();
         }}
         onKeyDown={handleKeyDown}
@@ -84,7 +83,7 @@ const InputBox = ({ onSend, onStop, isLoading, initialValue = "" }) => {
       ) : (
         <button
           onClick={handleSend}
-          disabled={!input.trim()}
+          disabled={!value.trim()}
           className="px-4 py-2 bg-blue-600 rounded disabled:opacity-50"
         >
           Send
