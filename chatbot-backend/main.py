@@ -6,7 +6,6 @@ from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
-
 load_dotenv()
 
 app = FastAPI()
@@ -22,7 +21,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY") or os.getenv("OPENAI_API_KEY")
+api_key = os.getenv("OPENROUTER_API_KEY")
 
 
 class Message(BaseModel):
@@ -86,7 +85,7 @@ async def chat_endpoint(req: ChatRequest):
             media_type="text/plain"
         )
 
-    if not OPENROUTER_API_KEY:
+    if not api_key:
         return StreamingResponse(
             iter(["⚠️ Missing API key configuration"]),
             media_type="text/plain"
@@ -101,10 +100,10 @@ async def chat_endpoint(req: ChatRequest):
             response = requests.post(
                 "https://openrouter.ai/api/v1/chat/completions",
                 headers={
-                    "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                    "Authorization": f"Bearer {api_key}",
                     "Content-Type": "application/json",
                     "HTTP-Referer": "http://localhost:5173",
-                    "X-Title": "AI Chat App",
+                    "X-Title": "BotGPT",
                 },
                 json={
                     "model": "openrouter/auto",  # 🔥 stable

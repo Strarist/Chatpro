@@ -1,7 +1,8 @@
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useState } from "react";
 
 const InputBox = ({ value, setValue, onSend, onStop, isLoading }) => {
   const textareaRef = useRef(null);
+  const [isFocused, setIsFocused] = useState(false);
 
   // =========================
   // 🔥 AUTO FOCUS
@@ -19,8 +20,11 @@ const InputBox = ({ value, setValue, onSend, onStop, isLoading }) => {
     const el = textareaRef.current;
     if (!el) return;
 
+    const maxHeight = 120;
+
     el.style.height = "auto";
-    el.style.height = `${el.scrollHeight}px`;
+    el.style.height = `${Math.min(el.scrollHeight, maxHeight)}px`;
+    el.style.overflowY = el.scrollHeight > maxHeight ? "auto" : "hidden";
   };
 
   useEffect(() => {
@@ -33,7 +37,7 @@ const InputBox = ({ value, setValue, onSend, onStop, isLoading }) => {
   const handleSend = () => {
     if (!value.trim() || isLoading) return;
 
-    onSend(value);
+    onSend(value.trim());
     setValue("");
 
     if (textareaRef.current) {
@@ -52,9 +56,14 @@ const InputBox = ({ value, setValue, onSend, onStop, isLoading }) => {
   };
 
   return (
-    <div className="flex items-end gap-3 bg-[#020617] border border-gray-800 rounded-2xl px-4 py-3 shadow-md">
-
-      {/* Textarea */}
+    <div
+      className={`
+        flex items-end gap-3 px-4 py-3 rounded-2xl
+        bg-[#020617] border transition-all duration-200
+        ${isFocused ? "border-blue-500 ring-1 ring-blue-500/30" : "border-[#1e293b]"}
+      `}
+    >
+      {/* TEXTAREA */}
       <textarea
         ref={textareaRef}
         value={value}
@@ -63,20 +72,28 @@ const InputBox = ({ value, setValue, onSend, onStop, isLoading }) => {
           autoResize();
         }}
         onKeyDown={handleKeyDown}
-        placeholder="Message..."
+        onFocus={() => setIsFocused(true)}
+        onBlur={() => setIsFocused(false)}
+        placeholder="Message ChatPro..."
         rows={1}
         className="
-          flex-1 resize-none bg-transparent text-white
-          outline-none text-sm leading-relaxed
-          max-h-40 overflow-y-auto
+          flex-1 resize-none bg-transparent outline-none
+          text-gray-200 placeholder:text-gray-500
+          text-sm leading-relaxed
+          max-h-[120px] overflow-hidden
         "
       />
 
-      {/* Button */}
+      {/* BUTTON */}
       {isLoading ? (
         <button
           onClick={onStop}
-          className="px-4 py-2 bg-red-600 rounded hover:bg-red-500"
+          className="
+            px-4 py-2 rounded-full text-sm font-medium
+            bg-red-600 text-white
+            hover:bg-red-500 active:scale-95
+            transition-all duration-150
+          "
         >
           Stop
         </button>
@@ -84,7 +101,15 @@ const InputBox = ({ value, setValue, onSend, onStop, isLoading }) => {
         <button
           onClick={handleSend}
           disabled={!value.trim()}
-          className="px-4 py-2 bg-blue-600 rounded disabled:opacity-50"
+          className={`
+  px-4 py-2 rounded-full text-sm font-medium
+  text-white transition-all duration-200 ease-out
+  ${
+    value.trim()
+      ? "bg-gradient-to-r from-blue-600 to-blue-500 hover:brightness-110 active:scale-95 shadow-md hover:shadow-lg"
+      : "bg-blue-600/40 cursor-not-allowed opacity-70"
+  }
+`}
         >
           Send
         </button>

@@ -30,9 +30,13 @@ const ChatWindow = ({ messages = [], setMessages }) => {
     const el = containerRef.current;
     if (!el) return;
 
-    requestAnimationFrame(() => {
-      el.scrollTop = el.scrollHeight;
-    });
+    const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 100;
+    
+    if (isNearBottom) {
+      requestAnimationFrame(() => {
+        el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+      });
+    }
   }, [messages]);
 
   const [activeVersionMap, setActiveVersionMap] = useState({});
@@ -45,7 +49,20 @@ const ChatWindow = ({ messages = [], setMessages }) => {
   // 🚀 SEND MESSAGE
   // =========================
   const sendMessage = async (content) => {
-    if (!content.trim() || isLoading) return;
+    const trimmedContent = String(content ?? "").trim();
+    if (!trimmedContent || isLoading) return;
+
+    if (
+      messages.length &&
+      messages[messages.length - 1]?.role === "user" &&
+      messages[messages.length - 1]?.content === trimmedContent
+    ) {
+      return;
+    }
+
+    controllerRef.current?.abort();
+    controllerRef.current = null;
+
     const requestId = activeRequestIdRef.current + 1;
     activeRequestIdRef.current = requestId;
   
@@ -124,12 +141,34 @@ const ChatWindow = ({ messages = [], setMessages }) => {
       });
   
     } catch (err) {
-      if (err.name !== "AbortError") {
-        setMessages((prev) => [
-          ...prev,
-          { role: "assistant", content: "⚠️ Error generating response" },
-        ]);
+      if (err.name === "AbortError") {
+        return;
       }
+
+      setMessages((prev) => {
+        const updated = [...prev];
+        const last = updated[updated.length - 1];
+
+        if (last?.role === "assistant" && last.isStreaming) {
+          updated[updated.length - 1] = {
+            ...last,
+            content: "Something went wrong. Please try again.",
+            isStreaming: false,
+          };
+          return updated;
+        }
+
+        return [
+          ...updated,
+          {
+            id: generateId(),
+            role: "assistant",
+            content: "Something went wrong. Please try again.",
+            isStreaming: false,
+            parentId: updatedMessages[updatedMessages.length - 1]?.id || null,
+          },
+        ];
+      });
     } finally {
       if (isMountedRef.current && requestId === activeRequestIdRef.current) {
         setIsLoading(false);
@@ -265,89 +304,138 @@ const ChatWindow = ({ messages = [], setMessages }) => {
   const versionMap = getVersions(messages);
 
   return (
-    <div className="flex flex-col h-full items-center">
+    <div className="w-full min-h-screen flex flex-col bg-[#020617] text-slate-100">
+      <header className="sticky top-0 z-50 border-b border-[#1e293b] bg-[#020617]/80 backdrop-blur-md shadow-sm shadow-black/10 px-6 h-[60px] flex items-center justify-between text-gray-200">
+        <div className="flex items-center gap-4">
+          <div className="w-10 h-10 rounded-2xl bg-blue-600 flex items-center justify-center text-white font-semibold shadow-sm shadow-blue-500/20">
+            A
+          </div>
+          <div className="leading-tight">
+            <div className="text-sm font-semibold text-slate-100">ChatPro</div>
+            <div className="text-xs text-gray-400">AI conversation</div>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+  <div className="w-8 h-8 rounded-md bg-blue-600 flex items-center justify-center text-white font-semibold">
+    A
+  </div>
+
+  <div>
+    <div className="text-sm font-semibold text-gray-200">ChatPro</div>
+    <div className="text-xs text-gray-400">AI conversation</div>
+  </div>
+</div>
+      </header>
 
       {/* Messages */}
       <div
         ref={containerRef}
-        className="w-full max-w-3xl flex-1 overflow-y-auto px-4 py-6 space-y-6"
+        className="mx-auto flex flex-col flex-1 w-full max-w-3xl overflow-y-auto px-6 sm:px-8 md:px-10 py-6 gap-6"
       >
-        {messages.map((msg, i) => {
-          if (msg.role === "user") {
-            return (
-              <MessageBubble
-                key={msg.id ?? `user-${i}`}
-                message={msg}
-                onEdit={() => handleEdit(i, msg.content)}
-              />
-            );
-          }
+        {messages.length === 0 ? (
+          <div className="flex flex-1 min-h-[300px] flex-col items-center justify-center text-center text-slate-400 space-y-4 py-12">
+            <div className="text-5xl">💬</div>
+            <div className="text-3xl font-semibold text-slate-100">ChatPro</div>
+            <div className="max-w-lg text-sm text-slate-500">
+              Ask anything and get instant AI-powered replies. Start the conversation by typing a question below.
+            </div>
+          </div>
+        ) : (
+          messages.map((msg, i) => {
+            if (msg.role === "user") {
+              return (
+                <MessageBubble
+                  key={msg.id ?? `user-${i}`}
+                  message={msg}
+                  onEdit={() => handleEdit(i, msg.content)}
+                />
+              );
+            }
 
-          // Assistant: no parentId → show as-is (legacy / welcome / error bubbles)
-          if (!msg.parentId) {
+            // Assistant: no parentId → show as-is (legacy / welcome / error bubbles)
+            if (!msg.parentId) {
+              return (
+                <MessageBubble
+                  key={msg.id ?? `assistant-${i}`}
+                  message={msg}
+                  onRegenerate={regenerateResponse}
+                />
+              );
+            }
+
+            const siblings = versionMap[msg.parentId] || [];
+            if (!siblings.length) {
+              return (
+                <MessageBubble
+                  key={msg.id ?? `assistant-${i}`}
+                  message={msg}
+                  onRegenerate={regenerateResponse}
+                />
+              );
+            }
+
+            const latest = siblings[siblings.length - 1];
+            const mappedId = activeVersionMap[msg.parentId];
+            const activeId =
+              mappedId && siblings.some((s) => s.id === mappedId)
+                ? mappedId
+                : latest?.id;
+            if (!activeId || msg.id !== activeId) return null;
+
+            const currentIndex = Math.max(
+              0,
+              siblings.findIndex((s) => s.id === activeId)
+            );
+
             return (
               <MessageBubble
                 key={msg.id ?? `assistant-${i}`}
                 message={msg}
                 onRegenerate={regenerateResponse}
+                versionIndex={currentIndex}
+                totalVersions={siblings.length}
+                onPrev={() => {
+                  if (currentIndex > 0) {
+                    setActiveVersionMap((prev) => ({
+                      ...prev,
+                      [msg.parentId]: siblings[currentIndex - 1].id,
+                    }));
+                  }
+                }}
+                onNext={() => {
+                  if (currentIndex < siblings.length - 1) {
+                    setActiveVersionMap((prev) => ({
+                      ...prev,
+                      [msg.parentId]: siblings[currentIndex + 1].id,
+                    }));
+                  }
+                }}
               />
             );
-          }
+          })
+        )}
 
-          const siblings = versionMap[msg.parentId] || [];
-          if (!siblings.length) {
-            return (
-              <MessageBubble
-                key={msg.id ?? `assistant-${i}`}
-                message={msg}
-                onRegenerate={regenerateResponse}
-              />
-            );
-          }
-
-          const latest = siblings[siblings.length - 1];
-          const mappedId = activeVersionMap[msg.parentId];
-          const activeId =
-            mappedId && siblings.some((s) => s.id === mappedId)
-              ? mappedId
-              : latest?.id;
-          if (!activeId || msg.id !== activeId) return null;
-
-          const currentIndex = Math.max(
-            0,
-            siblings.findIndex((s) => s.id === activeId)
-          );
-
-          return (
-            <MessageBubble
-              key={msg.id ?? `assistant-${i}`}
-              message={msg}
-              onRegenerate={regenerateResponse}
-              versionIndex={currentIndex}
-              totalVersions={siblings.length}
-              onPrev={() => {
-                if (currentIndex > 0) {
-                  setActiveVersionMap((prev) => ({
-                    ...prev,
-                    [msg.parentId]: siblings[currentIndex - 1].id,
-                  }));
-                }
-              }}
-              onNext={() => {
-                if (currentIndex < siblings.length - 1) {
-                  setActiveVersionMap((prev) => ({
-                    ...prev,
-                    [msg.parentId]: siblings[currentIndex + 1].id,
-                  }));
-                }
-              }}
-            />
-          );
-        })}
+        {/* Typing Indicator */}
+        {isLoading && !messages.some(msg => msg.role === "assistant" && msg.isStreaming) && (
+          <div className="w-full flex justify-start group animate-in fade-in slide-in-from-bottom-3 duration-300">
+            <div className="max-w-[700px] w-full relative px-2">
+              <div className="text-[11px] tracking-[0.18em] uppercase mb-2 px-1 text-left text-slate-400">
+                AI
+              </div>
+              <div className="max-w-[70%] rounded-[28px] bg-[#0f172a] border border-[#1e293b] text-slate-100 px-6 py-5 shadow-sm shadow-black/20">
+                <div className="flex items-center gap-1">
+                  <span className="inline-block w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: "0s" }} />
+                  <span className="inline-block w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: "0.1s" }} />
+                  <span className="inline-block w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: "0.2s" }} />
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Input */}
-      <div className="w-full max-w-3xl px-4 pb-6">
+      <div className="mx-auto w-full max-w-3xl px-4 pb-6">
       <InputBox
         value={editingIndex !== null ? editingText : input}
         setValue={(val) => {

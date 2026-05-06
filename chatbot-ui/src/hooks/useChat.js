@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { fetchAIResponse } from "../services/aiService";
+import { extractMemoryFromMessage, getMemory, updateMemory } from "../utils/memoryUtils";
 
 export const useChat = () => {
   const [messages, setMessages] = useState([
@@ -25,13 +26,18 @@ export const useChat = () => {
     };
     setMessages((prev) => [...prev, userMsg]);
 
+    const extracted = extractMemoryFromMessage(content);
+    if (extracted) updateMemory(extracted);
+
     setIsLoading(true);
 
     try {
-      const aiResponse = await fetchAIResponse([
-        ...messages,
-        userMsg
-      ]);
+      const memory = getMemory();
+      const recentMessages = [...messages, userMsg].slice(-8);
+      const requestMessages = memory && typeof memory.name === "string" && memory.name.trim()
+        ? [{ role: "system", content: `User name is ${memory.name.trim()}` }, ...recentMessages]
+        : recentMessages;
+      const aiResponse = await fetchAIResponse(requestMessages);
 
       // 🔥 Step 1: Add empty AI message
       let currentText = "";
