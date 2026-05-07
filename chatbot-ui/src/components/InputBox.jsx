@@ -58,9 +58,9 @@ const InputBox = ({ value, setValue, onSend, onStop, isLoading }) => {
   return (
     <div
       className={`
-        flex items-end gap-3 px-4 py-3 rounded-2xl
-        bg-[#020617] border transition-all duration-200
-        ${isFocused ? "border-blue-500 ring-1 ring-blue-500/30" : "border-[#1e293b]"}
+        flex min-w-0 items-end gap-2 rounded-2xl px-2.5 py-2.5 sm:gap-3 sm:px-4 sm:py-3
+        bg-[#020617] border transition-all duration-200 ease-out
+        ${isFocused ? "border-blue-500 shadow-sm shadow-blue-950/30 ring-1 ring-blue-500/25" : "border-[#1e293b]"}
       `}
     >
       {/* TEXTAREA */}
@@ -77,7 +77,7 @@ const InputBox = ({ value, setValue, onSend, onStop, isLoading }) => {
         placeholder="Message ChatPro..."
         rows={1}
         className="
-          flex-1 resize-none bg-transparent outline-none
+          min-w-0 flex-1 resize-none bg-transparent outline-none
           text-gray-200 placeholder:text-gray-500
           text-sm leading-relaxed
           max-h-[120px] overflow-hidden
@@ -89,10 +89,10 @@ const InputBox = ({ value, setValue, onSend, onStop, isLoading }) => {
         <button
           onClick={onStop}
           className="
-            px-4 py-2 rounded-full text-sm font-medium
+            shrink-0 whitespace-nowrap rounded-full px-3 py-2 text-sm font-medium sm:px-4
             bg-red-600 text-white
-            hover:bg-red-500 active:scale-95
-            transition-all duration-150
+            hover:bg-red-500 hover:brightness-110 active:scale-95
+            transition-all duration-200 ease-out
           "
         >
           Stop
@@ -102,11 +102,11 @@ const InputBox = ({ value, setValue, onSend, onStop, isLoading }) => {
           onClick={handleSend}
           disabled={!value.trim()}
           className={`
-  px-4 py-2 rounded-full text-sm font-medium
+  shrink-0 whitespace-nowrap rounded-full px-3 py-2 text-sm font-medium sm:px-4
   text-white transition-all duration-200 ease-out
   ${
     value.trim()
-      ? "bg-gradient-to-r from-blue-600 to-blue-500 hover:brightness-110 active:scale-95 shadow-md hover:shadow-lg"
+      ? "bg-gradient-to-r from-blue-600 to-blue-500 shadow-md hover:brightness-110 hover:shadow-lg active:scale-95"
       : "bg-blue-600/40 cursor-not-allowed opacity-70"
   }
 `}

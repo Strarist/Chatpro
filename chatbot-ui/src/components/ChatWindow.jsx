@@ -286,15 +286,30 @@ const ChatWindow = ({ messages = [], setMessages }) => {
     }
   };
 
+  const getAssistantParentKey = (msg, index, sourceMessages = messages) => {
+    if (msg.role !== "assistant") return null;
+    if (msg.parentId) return msg.parentId;
+
+    for (let i = index - 1; i >= 0; i--) {
+      if (sourceMessages[i]?.role === "user") {
+        return sourceMessages[i].id ?? `__user_slot_${i}`;
+      }
+    }
+
+    return null;
+  };
+
   const getVersions = (messages) => {
     const map = {};
   
-    messages.forEach((msg) => {
-      if (msg.role === "assistant" && msg.parentId) {
-        if (!map[msg.parentId]) {
-          map[msg.parentId] = [];
+    messages.forEach((msg, index) => {
+      const parentKey = getAssistantParentKey(msg, index, messages);
+
+      if (parentKey) {
+        if (!map[parentKey]) {
+          map[parentKey] = [];
         }
-        map[msg.parentId].push(msg);
+        map[parentKey].push(msg);
       }
     });
   
@@ -302,46 +317,52 @@ const ChatWindow = ({ messages = [], setMessages }) => {
   };
   
   const versionMap = getVersions(messages);
+  const latestAssistantIndex = messages.reduce(
+    (latest, msg, index) => (msg.role === "assistant" ? index : latest),
+    -1
+  );
+  const latestAssistantParentKey =
+    latestAssistantIndex >= 0
+      ? getAssistantParentKey(messages[latestAssistantIndex], latestAssistantIndex)
+      : null;
+  const canRegenerate = (msg, index) => {
+    const parentKey = getAssistantParentKey(msg, index);
+    return parentKey
+      ? parentKey === latestAssistantParentKey
+      : index === latestAssistantIndex;
+  };
 
   return (
-    <div className="w-full min-h-screen flex flex-col bg-[#020617] text-slate-100">
-      <header className="sticky top-0 z-50 border-b border-[#1e293b] bg-[#020617]/80 backdrop-blur-md shadow-sm shadow-black/10 px-6 h-[60px] flex items-center justify-between text-gray-200">
-        <div className="flex items-center gap-4">
-          <div className="w-10 h-10 rounded-2xl bg-blue-600 flex items-center justify-center text-white font-semibold shadow-sm shadow-blue-500/20">
+    <div className="flex min-h-screen min-w-0 flex-col bg-[#020617] text-slate-100">
+      <header className="sticky top-0 z-50 flex items-center justify-between gap-3 border-b border-[#1e293b] bg-[#020617]/80 px-3 py-3 backdrop-blur-md sm:px-5">
+        <div className="flex min-w-0 items-center gap-2.5 sm:gap-3">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-gradient-to-br from-blue-500 to-blue-700 text-sm font-semibold text-white shadow-sm shadow-blue-500/20">
             A
           </div>
-          <div className="leading-tight">
-            <div className="text-sm font-semibold text-slate-100">ChatPro</div>
-            <div className="text-xs text-gray-400">AI conversation</div>
+          <div className="min-w-0 leading-tight">
+            <div className="truncate text-sm font-semibold text-gray-200">ChatPro</div>
+            <div className="truncate text-xs text-gray-400">AI Assistant</div>
           </div>
         </div>
-        <div className="flex items-center gap-3">
-  <div className="w-8 h-8 rounded-md bg-blue-600 flex items-center justify-center text-white font-semibold">
-    A
-  </div>
-
-  <div>
-    <div className="text-sm font-semibold text-gray-200">ChatPro</div>
-    <div className="text-xs text-gray-400">AI conversation</div>
-  </div>
-</div>
+        <div className="flex shrink-0 items-center gap-2" />
       </header>
 
       {/* Messages */}
-      <div
-        ref={containerRef}
-        className="mx-auto flex flex-col flex-1 w-full max-w-3xl overflow-y-auto px-6 sm:px-8 md:px-10 py-6 gap-6"
-      >
-        {messages.length === 0 ? (
-          <div className="flex flex-1 min-h-[300px] flex-col items-center justify-center text-center text-slate-400 space-y-4 py-12">
-            <div className="text-5xl">💬</div>
-            <div className="text-3xl font-semibold text-slate-100">ChatPro</div>
-            <div className="max-w-lg text-sm text-slate-500">
-              Ask anything and get instant AI-powered replies. Start the conversation by typing a question below.
+      {messages.length === 0 ? (
+        <div className="flex flex-1 items-center justify-center">
+          <div className="text-center">
+            <div className="text-3xl font-semibold text-gray-200">ChatPro</div>
+            <div className="mt-2 text-sm text-gray-400">
+              Ask anything. Start a conversation.
             </div>
           </div>
-        ) : (
-          messages.map((msg, i) => {
+        </div>
+      ) : (
+        <div
+          ref={containerRef}
+          className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-3.5 overflow-y-auto px-2.5 py-4 sm:gap-4 sm:px-5 sm:py-5 md:px-8 lg:px-10"
+        >
+          {messages.map((msg, i) => {
             if (msg.role === "user") {
               return (
                 <MessageBubble
@@ -353,29 +374,36 @@ const ChatWindow = ({ messages = [], setMessages }) => {
             }
 
             // Assistant: no parentId → show as-is (legacy / welcome / error bubbles)
-            if (!msg.parentId) {
+            const parentKey = getAssistantParentKey(msg, i);
+
+            // Assistant without a user parent: show as-is (welcome / error bubbles)
+            if (!parentKey) {
               return (
                 <MessageBubble
                   key={msg.id ?? `assistant-${i}`}
                   message={msg}
-                  onRegenerate={regenerateResponse}
+                  onRegenerate={canRegenerate(msg, i) ? regenerateResponse : undefined}
+                  versionIndex={0}
+                  totalVersions={1}
                 />
               );
             }
 
-            const siblings = versionMap[msg.parentId] || [];
+            const siblings = versionMap[parentKey] || [];
             if (!siblings.length) {
               return (
                 <MessageBubble
                   key={msg.id ?? `assistant-${i}`}
                   message={msg}
-                  onRegenerate={regenerateResponse}
+                  onRegenerate={canRegenerate(msg, i) ? regenerateResponse : undefined}
+                  versionIndex={0}
+                  totalVersions={1}
                 />
               );
             }
 
             const latest = siblings[siblings.length - 1];
-            const mappedId = activeVersionMap[msg.parentId];
+            const mappedId = activeVersionMap[parentKey];
             const activeId =
               mappedId && siblings.some((s) => s.id === mappedId)
                 ? mappedId
@@ -391,14 +419,14 @@ const ChatWindow = ({ messages = [], setMessages }) => {
               <MessageBubble
                 key={msg.id ?? `assistant-${i}`}
                 message={msg}
-                onRegenerate={regenerateResponse}
+                onRegenerate={canRegenerate(msg, i) ? regenerateResponse : undefined}
                 versionIndex={currentIndex}
                 totalVersions={siblings.length}
                 onPrev={() => {
                   if (currentIndex > 0) {
                     setActiveVersionMap((prev) => ({
                       ...prev,
-                      [msg.parentId]: siblings[currentIndex - 1].id,
+                      [parentKey]: siblings[currentIndex - 1].id,
                     }));
                   }
                 }}
@@ -406,36 +434,36 @@ const ChatWindow = ({ messages = [], setMessages }) => {
                   if (currentIndex < siblings.length - 1) {
                     setActiveVersionMap((prev) => ({
                       ...prev,
-                      [msg.parentId]: siblings[currentIndex + 1].id,
+                      [parentKey]: siblings[currentIndex + 1].id,
                     }));
                   }
                 }}
               />
             );
-          })
-        )}
+          })}
 
         {/* Typing Indicator */}
         {isLoading && !messages.some(msg => msg.role === "assistant" && msg.isStreaming) && (
-          <div className="w-full flex justify-start group animate-in fade-in slide-in-from-bottom-3 duration-300">
-            <div className="max-w-[700px] w-full relative px-2">
+          <div className="group flex w-full justify-start animate-in fade-in slide-in-from-bottom-3 duration-200 ease-out">
+            <div className="relative w-full max-w-4xl px-1 sm:px-2">
               <div className="text-[11px] tracking-[0.18em] uppercase mb-2 px-1 text-left text-slate-400">
                 AI
               </div>
-              <div className="max-w-[70%] rounded-[28px] bg-[#0f172a] border border-[#1e293b] text-slate-100 px-6 py-5 shadow-sm shadow-black/20">
+              <div className="max-w-[90%] rounded-[24px] border border-[#1e293b] bg-[#0f172a] px-4 py-4 text-slate-100 shadow-sm shadow-black/20 transition-all duration-200 ease-out sm:max-w-[82%] sm:px-5 md:max-w-[74%] lg:max-w-[72%]">
                 <div className="flex items-center gap-1">
-                  <span className="inline-block w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: "0s" }} />
-                  <span className="inline-block w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: "0.1s" }} />
-                  <span className="inline-block w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: "0.2s" }} />
+                  <span className="inline-block h-2 w-2 rounded-full bg-slate-400/80 animate-pulse" style={{ animationDelay: "0s" }} />
+                  <span className="inline-block h-2 w-2 rounded-full bg-slate-400/70 animate-pulse" style={{ animationDelay: "0.12s" }} />
+                  <span className="inline-block h-2 w-2 rounded-full bg-slate-400/60 animate-pulse" style={{ animationDelay: "0.24s" }} />
                 </div>
               </div>
             </div>
           </div>
         )}
-      </div>
+        </div>
+      )}
 
       {/* Input */}
-      <div className="mx-auto w-full max-w-3xl px-4 pb-6">
+      <div className="mx-auto w-full max-w-4xl px-2.5 pb-3 sm:px-5 sm:pb-5 md:px-8 md:pb-6 lg:px-10">
       <InputBox
         value={editingIndex !== null ? editingText : input}
         setValue={(val) => {
@@ -452,3 +480,4 @@ const ChatWindow = ({ messages = [], setMessages }) => {
 };
 
 export default ChatWindow;
+

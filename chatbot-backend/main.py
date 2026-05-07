@@ -1,27 +1,47 @@
 import os
 import json
 import requests
+from pathlib import Path
 from fastapi import FastAPI
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from dotenv import load_dotenv
-load_dotenv()
+load_dotenv(dotenv_path=Path(__file__).with_name(".env"))
 
 app = FastAPI()
+
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+OPENROUTER_API_URL = os.getenv(
+    "OPENROUTER_API_URL",
+    "https://openrouter.ai/api/v1/chat/completions",
+)
+OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "openrouter/auto")
+APP_TITLE = os.getenv("APP_TITLE", "BotGPT")
+MAX_TOKENS = int(os.getenv("MAX_TOKENS", "300"))
+TEMPERATURE = float(os.getenv("TEMPERATURE", "0.7"))
+REQUEST_TIMEOUT = float(os.getenv("OPENROUTER_TIMEOUT_SECONDS", "60"))
+CONNECT_TIMEOUT = float(os.getenv("OPENROUTER_CONNECT_TIMEOUT_SECONDS", "10"))
+FRONTEND_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv("FRONTEND_ORIGINS", "http://localhost:5173").split(",")
+    if origin.strip()
+]
+APP_REFERER = os.getenv(
+    "APP_REFERER",
+    FRONTEND_ORIGINS[0] if FRONTEND_ORIGINS else "http://localhost:5173",
+)
 
 # =========================
 # ✅ CORS CONFIG
 # =========================
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=FRONTEND_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-api_key = os.getenv("OPENROUTER_API_KEY")
 
 
 class Message(BaseModel):
@@ -30,7 +50,14 @@ class Message(BaseModel):
 
 
 class ChatRequest(BaseModel):
-    messages: list[Message] = []
+    messages: list[Message] = Field(default_factory=list)
+
+
+def error_response(code: str, message: str, status_code: int = 400):
+    return JSONResponse(
+        status_code=status_code,
+        content={"error": {"code": code, "message": message}},
+    )
 
 
 # =========================
@@ -80,15 +107,17 @@ async def chat_endpoint(req: ChatRequest):
     # ❗ SAFETY CHECK
     # =========================
     if not any(m["role"] == "user" for m in messages):
-        return StreamingResponse(
-            iter(["⚠️ No user input found"]),
-            media_type="text/plain"
+        return error_response(
+            "empty_user_message",
+            "No user input found",
+            status_code=400,
         )
 
-    if not api_key:
-        return StreamingResponse(
-            iter(["⚠️ Missing API key configuration"]),
-            media_type="text/plain"
+    if not OPENROUTER_API_KEY:
+        return error_response(
+            "missing_api_key",
+            "Missing API key configuration",
+            status_code=500,
         )
 
     # =========================
@@ -98,31 +127,30 @@ async def chat_endpoint(req: ChatRequest):
         response = None
         try:
             response = requests.post(
-                "https://openrouter.ai/api/v1/chat/completions",
+                OPENROUTER_API_URL,
                 headers={
-                    "Authorization": f"Bearer {api_key}",
+                    "Authorization": f"Bearer {OPENROUTER_API_KEY}",
                     "Content-Type": "application/json",
-                    "HTTP-Referer": "http://localhost:5173",
-                    "X-Title": "BotGPT",
+                    "HTTP-Referer": APP_REFERER,
+                    "X-Title": APP_TITLE,
                 },
                 json={
-                    "model": "openrouter/auto",  # 🔥 stable
+                    "model": OPENROUTER_MODEL,
                     "messages": messages,
                     "stream": True,
-                    "max_tokens": 300,      # ✅ prevents overflow
-                    "temperature": 0.7,     # ✅ stable responses
+                    "max_tokens": MAX_TOKENS,
+                    "temperature": TEMPERATURE,
                 },
                 stream=True,
-                timeout=60,
+                timeout=(CONNECT_TIMEOUT, REQUEST_TIMEOUT),
             )
 
             # =========================
             # ❌ HANDLE API ERROR
             # =========================
             if response.status_code != 200:
-                error_text = response.text
-                print("❌ OPENROUTER ERROR:", error_text)
-                yield f"⚠️ API Error: {error_text}"
+                print("OPENROUTER ERROR:", response.status_code)
+                yield "Error: upstream AI service returned an error"
                 return
 
             # =========================
@@ -154,14 +182,21 @@ async def chat_endpoint(req: ChatRequest):
                         yield content
 
                 except Exception as e:
-                    print("⚠️ PARSE ERROR:", e)
+                    print("PARSE ERROR:", e)
                     continue
 
+        except requests.Timeout:
+            print("OPENROUTER TIMEOUT")
+            yield "Error: upstream AI service timed out"
+        except requests.RequestException as e:
+            print("OPENROUTER REQUEST ERROR:", str(e))
+            yield "Error: upstream AI service unavailable"
         except Exception as e:
-            print("🔥 FULL ERROR:", str(e))
-            yield "⚠️ Error generating response"
+            print("FULL ERROR:", str(e))
+            yield "Error generating response"
         finally:
             if response is not None:
                 response.close()
 
     return StreamingResponse(generate(), media_type="text/plain")
+

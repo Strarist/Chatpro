@@ -136,7 +136,7 @@ function App() {
   };
 
   return (
-    <div className="flex h-screen bg-[#0f172a] text-white">
+    <div className="flex h-screen min-w-0 overflow-hidden bg-[#0f172a] text-white sm:h-[100dvh]">
 
       {/* Sidebar */}
       <Sidebar
@@ -148,7 +148,7 @@ function App() {
       />
 
       {/* Chat Window */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex min-w-0 flex-1 flex-col">
 
         {activeChat ? (
           <ChatWindow

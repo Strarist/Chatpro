@@ -1,4 +1,4 @@
-﻿import ReactMarkdown from "react-markdown";
+import ReactMarkdown from "react-markdown";
 import { useState } from "react";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
@@ -9,8 +9,13 @@ const MessageBubble = ({
   message,
   onEdit,
   onRegenerate,
+  versionIndex = 0,
+  totalVersions = 1,
+  onPrev,
+  onNext,
 }) => {
   const [copied, setCopied] = useState(false);
+  const [reaction, setReaction] = useState(null);
 
   if (!message) return null;
 
@@ -26,58 +31,56 @@ const MessageBubble = ({
     }
   };
 
-  const [reaction, setReaction] = useState(null);
-
   return (
     <div
       className={`w-full flex ${
         isUser ? "justify-end" : "justify-start"
-      } group animate-in fade-in slide-in-from-bottom-1 duration-200`}
+        } group animate-in fade-in slide-in-from-bottom-1 duration-200 ease-out`}
     >
       {isUser ? (
         // ================= USER =================
-        <div className="flex items-center gap-3 max-w-[700px] w-full justify-end px-2">
+        <div className="flex w-full max-w-4xl flex-col items-end gap-2 px-0.5 sm:px-2">
 
-          {/* ACTIONS (LEFT OF USER BUBBLE) */}
+          {/* USER BUBBLE */}
+          <div className="max-w-[90%] rounded-[22px] bg-blue-600 px-4 py-3 text-[15px] leading-relaxed text-white shadow-sm shadow-black/25 transition-all duration-200 ease-out hover:bg-blue-500 hover:shadow-md hover:shadow-blue-950/20 sm:max-w-[82%] sm:rounded-[24px] sm:px-5 md:max-w-[74%] lg:max-w-[72%]">
+            {message.content}
+          </div>
+
+          {/* ACTIONS BELOW USER BUBBLE */}
           {!message.isStreaming && (
-            <div className="text-xs text-gray-400 flex gap-2">
+            <div className="mr-1 flex gap-3 text-xs text-gray-400 opacity-0 transition-all duration-200 ease-out group-hover:opacity-100">
               <button
                 onClick={handleCopy}
-                className="hover:text-gray-200 transition"
+                className="rounded-md px-1 transition-all duration-200 ease-out hover:text-gray-200 active:scale-95"
               >
-                {copied ? "✓ Copied" : "Copy"}
+                {copied ? "\u2713 Copied" : "Copy"}
               </button>
 
               {onEdit && (
                 <button
                   onClick={onEdit}
-                  className="hover:text-gray-200 transition"
+                  className="rounded-md px-1 transition-all duration-200 ease-out hover:text-gray-200 active:scale-95"
                 >
                   Edit
                 </button>
               )}
             </div>
           )}
-
-          {/* USER BUBBLE */}
-          <div className="max-w-[75%] rounded-[32px] bg-blue-600 hover:bg-blue-500 text-white px-5 py-3 shadow-sm shadow-black/25 text-[15px] leading-relaxed break-words">
-            {message.content}
-          </div>
         </div>
       ) : (
         // ================= AI =================
-        <div className="flex items-start gap-3 max-w-[700px] w-full px-2">
+        <div className="flex w-full max-w-4xl items-start gap-2 px-0.5 sm:gap-3 sm:px-2">
 
           {/* AVATAR */}
-          <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-sm font-semibold text-white">
+          <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-blue-600 text-xs font-semibold text-white sm:h-8 sm:w-8 sm:text-sm">
             A
           </div>
 
           {/* MESSAGE + ACTIONS (VERTICAL STACK) */}
-          <div className="flex flex-col gap-2 max-w-[75%] w-full">
+          <div className="flex w-full max-w-[90%] flex-col gap-2 sm:max-w-[82%] md:max-w-[74%] lg:max-w-[72%]">
 
             {/* MESSAGE BUBBLE */}
-<div className="w-full rounded-[28px] bg-[#0f172a] border border-[#1e293b] text-slate-100 px-5 py-3 shadow-sm shadow-black/20 text-[15px] leading-relaxed break-words transition-all duration-200 hover:shadow-md hover:border-[#334155]">
+<div className="w-full overflow-hidden rounded-[22px] border border-[#1e293b] bg-[#0f172a] px-4 py-3 text-[15px] leading-relaxed text-slate-100 shadow-sm shadow-black/20 break-words transition-all duration-200 ease-out hover:border-[#334155] hover:shadow-md hover:shadow-black/25 sm:rounded-[24px] sm:px-5">
               <ReactMarkdown
                 components={{
                   p: ({ children }) => (
@@ -123,32 +126,33 @@ const MessageBubble = ({
 
               {/* STREAM CURSOR */}
               {message.isStreaming && (
-                <span className="inline w-[2px] h-[1em] bg-white ml-0.5 animate-pulse" />
+                <span className="ml-0.5 inline-block h-[1em] w-[2px] rounded-full bg-blue-200/80 align-[-0.125em] animate-pulse" />
               )}
             </div>
 
             {/* ACTIONS BELOW */}
             {!message.isStreaming && (
-              <div className="flex items-center gap-3 text-xs text-gray-400 ml-1 opacity-0 group-hover:opacity-100 transition-all duration-200">
+              <>
+              <div className="ml-1 flex items-center gap-3 text-xs text-gray-400 opacity-0 transition-all duration-200 ease-out group-hover:opacity-100">
 
 
 
   <button
   onClick={() => setReaction("up")}
-  className={`text-sm transition ${
+  className={`rounded-md px-1 text-sm transition-all duration-200 ease-out active:scale-95 ${
     reaction === "up" ? "text-green-400" : "hover:text-gray-200"
   }`}
 >
-  👍
+  {"\u{1F44D}"}
 </button>
 
 <button
   onClick={() => setReaction("down")}
-  className={`text-sm transition ${
+  className={`rounded-md px-1 text-sm transition-all duration-200 ease-out active:scale-95 ${
     reaction === "down" ? "text-red-400" : "hover:text-gray-200"
   }`}
 >
-  👎
+  {"\u{1F44E}"}
 </button>
 
   {/* Divider */}
@@ -157,22 +161,46 @@ const MessageBubble = ({
   {/* Copy */}
   <button
     onClick={handleCopy}
-    className="hover:text-gray-200 transition"
+    className="rounded-md px-1 transition-all duration-200 ease-out hover:text-gray-200 active:scale-95"
   >
-    {copied ? "✓ Copied" : "Copy"}
+    {copied ? "\u2713 Copied" : "Copy"}
   </button>
 
   {/* Regenerate */}
   {onRegenerate && (
     <button
       onClick={onRegenerate}
-      className="hover:text-gray-200 transition"
+      className="rounded-md px-1 transition-all duration-200 ease-out hover:text-gray-200 active:scale-95"
     >
       Regenerate
     </button>
   )}
 
 </div>
+              {totalVersions > 1 && (
+                <div className="ml-1 flex items-center gap-2 text-xs text-gray-500">
+                  <button
+                    onClick={onPrev}
+                    disabled={versionIndex <= 0}
+                    className="rounded-md px-2 py-1 transition-all duration-200 ease-out hover:bg-slate-800 hover:text-gray-200 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-gray-500 disabled:active:scale-100"
+                    aria-label="Previous response version"
+                  >
+                    {"<"}
+                  </button>
+                  <span className="tabular-nums text-gray-400">
+                    {versionIndex + 1} / {totalVersions}
+                  </span>
+                  <button
+                    onClick={onNext}
+                    disabled={versionIndex >= totalVersions - 1}
+                    className="rounded-md px-2 py-1 transition-all duration-200 ease-out hover:bg-slate-800 hover:text-gray-200 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-gray-500 disabled:active:scale-100"
+                    aria-label="Next response version"
+                  >
+                    {">"}
+                  </button>
+                </div>
+              )}
+              </>
             )}
 
           </div>
