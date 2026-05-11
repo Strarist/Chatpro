@@ -5,6 +5,9 @@ const AppLogo = ({ size = "md" }) => {
     lg: "h-10 w-10",
   };
 
+  const API_URL =
+  import.meta.env.VITE_API_URL || "http://localhost:8000";
+
   const iconClasses = {
     sm: "h-3.5 w-3.5",
     md: "h-4 w-4",
