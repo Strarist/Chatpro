@@ -2,6 +2,7 @@ import MessageBubble from "./MessageBubble";
 import InputBox from "./InputBox";
 import { useEffect, useRef, useState } from "react";
 import { streamAIResponse } from "../services/aiService";
+import AppLogo from "./AppLogo";
 
 const ChatWindow = ({ messages = [], setMessages }) => {
   const [isLoading, setIsLoading] = useState(false);
@@ -89,6 +90,7 @@ const ChatWindow = ({ messages = [], setMessages }) => {
     }
 
     setMessages(updatedMessages);
+    setInput("");
     setIsLoading(true);
   
     try {
@@ -277,12 +279,29 @@ const ChatWindow = ({ messages = [], setMessages }) => {
       // finish streaming
       setMessages((prev) => {
         const updated = [...prev];
-        updated[updated.length - 1].isStreaming = false;
+        if (!updated.length) return updated;
+
+        const last = updated[updated.length - 1];
+        if (last?.role === "assistant") {
+          updated[updated.length - 1] = {
+            ...last,
+            isStreaming: false,
+          };
+        }
+
         return updated;
       });
-  
+
+
+    } catch (err) {
+      if (err.name !== "AbortError") {
+        console.error("Regeneration failed:", err);
+      }
     } finally {
-      setIsLoading(false);
+      controllerRef.current = null;
+      if (isMountedRef.current) {
+        setIsLoading(false);
+      }
     }
   };
 
@@ -335,13 +354,11 @@ const ChatWindow = ({ messages = [], setMessages }) => {
   return (
     <div className="flex min-h-screen min-w-0 flex-col bg-[#020617] text-slate-100">
       <header className="sticky top-0 z-50 flex items-center justify-between gap-3 border-b border-[#1e293b] bg-[#020617]/80 px-3 py-3 backdrop-blur-md sm:px-5">
-        <div className="flex min-w-0 items-center gap-2.5 sm:gap-3">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-gradient-to-br from-blue-500 to-blue-700 text-sm font-semibold text-white shadow-sm shadow-blue-500/20">
-            A
-          </div>
+        <div className="flex min-w-0 items-center gap-3">
+          <AppLogo />
           <div className="min-w-0 leading-tight">
-            <div className="truncate text-sm font-semibold text-gray-200">ChatPro</div>
-            <div className="truncate text-xs text-gray-400">AI Assistant</div>
+            <div className="truncate text-sm font-semibold tracking-[-0.01em] text-gray-100">ChatPro</div>
+            <div className="truncate text-xs text-gray-500">AI Assistant</div>
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-2" />

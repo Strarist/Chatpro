@@ -1,3 +1,5 @@
+import AppLogo from "./AppLogo";
+
 const Sidebar = ({
   chats,
   activeChatId,
@@ -11,14 +13,18 @@ const Sidebar = ({
       <div className="p-2.5 sm:p-3 md:p-4">
         <button
           onClick={createNewChat}
-          className="w-full rounded-xl bg-blue-600 px-3 py-2.5 text-sm font-semibold text-white shadow-sm shadow-blue-950/30 transition-all duration-200 ease-out hover:bg-blue-500 hover:brightness-110 hover:shadow-md hover:shadow-blue-950/30 active:scale-[0.98] active:bg-blue-700 sm:px-4"
+          className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600/90 px-3 py-2 text-sm font-medium text-white shadow-sm shadow-blue-950/20 transition-all duration-200 ease-out hover:bg-blue-500 hover:shadow-md hover:shadow-blue-950/25 active:scale-[0.98] active:bg-blue-700 sm:px-4"
         >
-          + New Chat
+          <span className="text-base leading-none">+</span>
+          <span>New Chat</span>
         </button>
       </div>
 
       {/* Chat List */}
       <div className="flex-1 space-y-1 overflow-y-auto px-2 pb-3 sm:space-y-1.5 sm:px-3">
+        <div className="px-2 pb-1 text-[11px] font-medium uppercase tracking-[0.14em] text-slate-600">
+          Chats
+        </div>
         {chats.map((chat) => (
           <div
             key={chat.id}
@@ -51,14 +57,12 @@ const Sidebar = ({
 
       <div className="border-t border-[#1e293b] p-2.5 sm:p-3 md:p-4">
         <div className="flex items-center gap-2 rounded-xl px-1 py-2 text-gray-400 sm:gap-3 sm:px-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-slate-800 text-xs font-semibold text-gray-300">
-            A
-          </div>
+          <AppLogo />
           <div className="min-w-0">
-            <div className="truncate text-sm font-medium text-gray-300">
+            <div className="truncate text-sm font-semibold tracking-[-0.01em] text-gray-200">
               ChatPro
             </div>
-            <div className="text-xs text-gray-500">Workspace</div>
+            <div className="text-xs text-gray-500">AI workspace</div>
           </div>
         </div>
       </div>
