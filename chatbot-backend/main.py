@@ -25,6 +25,40 @@ CONNECT_TIMEOUT = float(os.getenv("OPENROUTER_CONNECT_TIMEOUT_SECONDS", "10"))
 FRONTEND_ORIGINS = [
     origin.strip()
     for origin in os.getenv("FRONTEND_ORIGINS", "http://localhost:5173").split(",")
+    # Add more logic here if needed (e.g., input validation)
+
+    async def generate():
+        async with httpx.AsyncClient() as client:
+            headers = {
+                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                "Content-Type": "application/json",
+                "HTTP-Referer": "http://localhost:5000", # Optional
+                "X-Title": "FastAPI Chatbot", # Optional
+            }
+            payload = {
+                "model": "google/learnlm-1.5-pro-experimental:free",
+                "messages": messages,
+                "stream": True,
+            }
+
+            async with client.stream(
+                "POST",
+                OPENROUTER_URL,
+                headers=headers,
+                json=payload,
+            ) as response:
+                if response.status_code != 200:
+                    yield f"data: {json.dumps({'error': 'Failed to fetch from OpenRouter'})}\n\n"
+                    return
+
+                async for line in response.aiter_lines():
+                    if line:
+                        yield f"{line}\n\n"
+
+    return StreamingResponse(generate(), media_type="text/event-stream")
+
+except Exception as e:
+    return {"error": str(e)}
     if origin.strip()
 ]
 APP_REFERER = os.getenv(
