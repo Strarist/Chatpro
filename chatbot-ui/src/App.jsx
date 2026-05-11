@@ -2,28 +2,36 @@ import { useState, useEffect, useMemo } from "react";
 import ChatWindow from "./components/ChatWindow";
 import Sidebar from "./components/Sidebar";
 
+// Production backend URL
+const API_URL =
+  import.meta.env.VITE_API_URL ||
+  "https://chatpro-backend-lxvu.onrender.com";
+
+// Expose globally for components that use window.API_URL
+if (typeof window !== "undefined") {
+  window.API_URL = API_URL;
+}
+
 // =========================
 // 🧠 DEFAULT CHAT FACTORY
 // =========================
 const createDefaultChat = () => ({
   id: Date.now(),
   title: "New Chat",
-  messages: [
-    { role: "assistant", content: "Hi! Ask me anything." },
-  ],
+  messages: [{ role: "assistant", content: "Hi! Ask me anything." }],
 });
 
 function App() {
-
   // =========================
   // 🧠 LOAD CHATS
   // =========================
   const [chats, setChats] = useState(() => {
     try {
       const saved = localStorage.getItem("chats");
+
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
+        if (Array.isArray(parsed) && parsed.length > 0) {
           return parsed;
         }
       }
@@ -31,7 +39,8 @@ function App() {
       console.error("Failed to parse chats:", err);
     }
 
-    return [];
+    // Initialize with one default chat
+    return [createDefaultChat()];
   });
 
   // =========================
@@ -39,7 +48,13 @@ function App() {
   // =========================
   const [activeChatId, setActiveChatId] = useState(() => {
     const saved = localStorage.getItem("activeChatId");
-    return saved ? Number(saved) : null;
+
+    if (saved) {
+      return Number(saved);
+    }
+
+    // Match the initial default chat
+    return chats[0]?.id ?? null;
   });
 
   // =========================
@@ -123,8 +138,9 @@ function App() {
       const updated = prev.filter((chat) => chat.id !== id);
 
       if (!updated.length) {
-        setActiveChatId(null);
-        return [];
+        const newChat = createDefaultChat();
+        setActiveChatId(newChat.id);
+        return [newChat];
       }
 
       if (id === activeChatId) {
@@ -137,8 +153,6 @@ function App() {
 
   return (
     <div className="flex h-screen min-w-0 overflow-hidden bg-[#0f172a] text-white sm:h-[100dvh]">
-
-      {/* Sidebar */}
       <Sidebar
         chats={chats}
         activeChatId={activeChat?.id}
@@ -147,9 +161,7 @@ function App() {
         deleteChat={deleteChat}
       />
 
-      {/* Chat Window */}
       <div className="flex min-w-0 flex-1 flex-col">
-
         {activeChat ? (
           <ChatWindow
             key={activeChat.id}
@@ -157,18 +169,16 @@ function App() {
             setMessages={updateMessages}
           />
         ) : (
-          <div className="flex-1 flex items-center justify-center text-gray-400">
+          <div className="flex flex-1 items-center justify-center text-gray-400">
             <div className="text-center">
-              <h2 className="text-lg mb-2">No chats yet</h2>
+              <h2 className="mb-2 text-lg">No chats yet</h2>
               <p className="text-sm">
                 Click “New Chat” to start a conversation
               </p>
             </div>
           </div>
         )}
-
       </div>
-
     </div>
   );
 }
