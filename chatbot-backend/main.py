@@ -115,7 +115,7 @@ def root():
 # 🚀 CHAT ENDPOINT
 # =========================
 @app.post("/chat")
-async def chat_endpoint(req: ChatRequest):
+def chat_endpoint(req: ChatRequest):
     raw_messages = req.messages
 
     # System prompt
@@ -176,7 +176,7 @@ async def chat_endpoint(req: ChatRequest):
                 headers={
                     "Authorization": f"Bearer {OPENROUTER_API_KEY}",
                     "Content-Type": "application/json",
-                    "HTTP-Referer": APP_REFERER,
+                    "Referer": APP_REFERER,
                     "X-Title": APP_TITLE,
                 },
                 json={
@@ -194,7 +194,9 @@ async def chat_endpoint(req: ChatRequest):
                 # Include the upstream response body in the SSE error payload
                 body_text = response.text or ""
                 body_text = body_text.strip()
-                print("OPENROUTER ERROR:", response.status_code, body_text)
+                print(
+                    f"OPENROUTER ERROR: status={response.status_code} model={OPENROUTER_MODEL} body={body_text}"
+                )
                 yield sse_error(
                     f"OpenRouter error: {body_text}",
                     "upstream_http_error",
