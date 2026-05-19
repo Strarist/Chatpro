@@ -19,7 +19,39 @@ const ChatWindow = ({ messages = [], setMessages }) => {
     isMountedRef.current = true;
     return () => {
       isMountedRef.current = false;
-      controllerRef.current?.abort();
+      if (controllerRef.current) {
+        controllerRef.current.abort();
+        finalizeStreamingResponse();
+      }
+    };
+  }, []);
+
+  const finalizeStreamingResponse = () => {
+    setMessages((prev) => {
+      const updated = [...prev];
+      const lastMsg = updated[updated.length - 1];
+
+      if (lastMsg?.role === "assistant" && lastMsg.isStreaming) {
+        updated[updated.length - 1] = {
+          ...lastMsg,
+          isStreaming: false,
+        };
+      }
+      return updated;
+    });
+  };
+
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (controllerRef.current) {
+        controllerRef.current.abort();
+      }
+      finalizeStreamingResponse();
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
     };
   }, []);
 
@@ -32,13 +64,21 @@ const ChatWindow = ({ messages = [], setMessages }) => {
     if (!el) return;
 
     const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 100;
-    
+
     if (isNearBottom) {
       requestAnimationFrame(() => {
         el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
       });
     }
   }, [messages]);
+
+  useEffect(() => {
+    if (controllerRef.current && isLoading) {
+      controllerRef.current.abort();
+      finalizeStreamingResponse();
+      setIsLoading(false);
+    }
+  }, [messages.length > 0 ? messages[0]?.id : null]);
 
   const [activeVersionMap, setActiveVersionMap] = useState({});
 
@@ -144,6 +184,7 @@ const ChatWindow = ({ messages = [], setMessages }) => {
   
     } catch (err) {
       if (err.name === "AbortError") {
+        finalizeStreamingResponse();
         return;
       }
 
@@ -294,7 +335,9 @@ const ChatWindow = ({ messages = [], setMessages }) => {
 
 
     } catch (err) {
-      if (err.name !== "AbortError") {
+      if (err.name === "AbortError") {
+        finalizeStreamingResponse();
+      } else {
         console.error("Regeneration failed:", err);
       }
     } finally {
