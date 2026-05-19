@@ -2,12 +2,16 @@ import { useState, useEffect, useMemo } from "react";
 import ChatWindow from "./components/ChatWindow";
 import Sidebar from "./components/Sidebar";
 
-// Production backend URL
-const API_URL =
-  import.meta.env.VITE_API_URL ||
-  "https://chatpro-backend-lxvu.onrender.com";
+const isLocalhost =
+  typeof window !== "undefined" &&
+  (window.location.hostname === "localhost" ||
+    window.location.hostname === "127.0.0.1");
 
-// Expose globally for components that use window.API_URL
+const API_URL = isLocalhost
+  ? "http://localhost:8000"
+  : (import.meta.env.VITE_API_URL ||
+      "https://chatpro-backend-lxvu.onrender.com");
+
 if (typeof window !== "undefined") {
   window.API_URL = API_URL;
 }
