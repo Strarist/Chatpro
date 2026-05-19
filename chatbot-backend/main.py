@@ -191,9 +191,12 @@ async def chat_endpoint(req: ChatRequest):
             )
 
             if response.status_code != 200:
-                print("OPENROUTER ERROR:", response.status_code, response.text)
+                # Include the upstream response body in the SSE error payload
+                body_text = response.text or ""
+                body_text = body_text.strip()
+                print("OPENROUTER ERROR:", response.status_code, body_text)
                 yield sse_error(
-                    "Upstream AI service returned an error.",
+                    f"OpenRouter error: {body_text}",
                     "upstream_http_error",
                 )
                 return

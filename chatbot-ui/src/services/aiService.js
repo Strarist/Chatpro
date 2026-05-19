@@ -1,5 +1,22 @@
-export const streamAIResponse = async (messages, onChunk, controller) => {
-  const res = await fetch("http://localhost:8000/chat", {
+// Production-safe API URL
+const API_URL =
+  window.API_URL ||
+  import.meta.env.VITE_API_URL ||
+  "https://chatpro-backend-lxvu.onrender.com";
+
+/**
+ * Streams AI response from the backend.
+ *
+ * @param {Array} messages - Chat messages.
+ * @param {Function} onChunk - Called with the progressively built response text.
+ * @param {AbortController} controller - Optional abort controller.
+ */
+export const streamAIResponse = async (
+  messages,
+  onChunk,
+  controller
+) => {
+  const res = await fetch(`${API_URL}/chat`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -9,7 +26,19 @@ export const streamAIResponse = async (messages, onChunk, controller) => {
   });
 
   if (!res.ok) {
-    throw new Error("Network response failed");
+    let errorMessage = "Network response failed";
+
+    try {
+      const errorData = await res.json();
+      errorMessage =
+        errorData?.error?.message ||
+        errorData?.detail ||
+        errorMessage;
+    } catch {
+      // Ignore JSON parsing failures
+    }
+
+    throw new Error(errorMessage);
   }
 
   if (!res.body) {
@@ -20,24 +49,57 @@ export const streamAIResponse = async (messages, onChunk, controller) => {
   const decoder = new TextDecoder("utf-8");
 
   let fullText = "";
+  let buffer = "";
+
+  const processLine = (rawLine) => {
+    const line = rawLine.trim();
+    if (!line || !line.startsWith("data: ")) {
+      return;
+    }
+
+    const payload = line.slice(6).trim();
+    if (payload === "[DONE]") {
+      return;
+    }
+
+    let json;
+    try {
+      json = JSON.parse(payload);
+      console.log("SSE payload:", json);
+    } catch {
+      return;
+    }
+
+    const deltaText = json.choices?.[0]?.delta?.content;
+    const messageText = json.choices?.[0]?.message?.content;
+    const text = deltaText ?? messageText;
+
+    if (typeof text === "string" && text.length > 0) {
+      fullText += text;
+      onChunk(fullText);
+    }
+  };
 
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
 
     const chunk = decoder.decode(value, { stream: true });
+    if (!chunk) continue;
 
-    // 🔥 FIX: only append NEW data
-    const newPart = chunk;
+    buffer += chunk;
+    const lines = buffer.split(/\r?\n/);
+    buffer = lines.pop();
 
-    fullText += newPart;
-
-    onChunk(fullText); // always send full clean text
+    for (const line of lines) {
+      processLine(line);
+    }
   }
 
-  const tail = decoder.decode();
-  if (tail) {
-    fullText += tail;
-    onChunk(fullText);
+  // Handle any remaining partial line
+  if (buffer) {
+    processLine(buffer);
   }
+
+  return fullText;
 };
