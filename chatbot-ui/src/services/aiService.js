@@ -71,7 +71,6 @@ export const streamAIResponse = async (
     let json;
     try {
       json = JSON.parse(payload);
-      console.log("SSE payload:", json);
     } catch {
       return;
     }
