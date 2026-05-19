@@ -1,8 +1,14 @@
 // Production-safe API URL
-const API_URL =
-  window.API_URL ||
-  import.meta.env.VITE_API_URL ||
-  "https://chatpro-backend-lxvu.onrender.com";
+const API_URL = (() => {
+  const defaultUrl = "https://chatpro-backend-lxvu.onrender.com";
+  const localUrl = "http://localhost:8000";
+  const hostname = typeof window !== "undefined" ? window.location.hostname : "";
+
+  if (window.API_URL) return window.API_URL;
+  if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL;
+  if (hostname === "localhost" || hostname === "127.0.0.1") return localUrl;
+  return defaultUrl;
+})();
 
 /**
  * Streams AI response from the backend.
