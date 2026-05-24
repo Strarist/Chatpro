@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import { Zap, MessageSquare, Server } from "lucide-react";
 
 export default function LandingPage({ onStartChat }) {
   const containerVariants = {
@@ -116,6 +117,64 @@ export default function LandingPage({ onStartChat }) {
     },
   };
 
+  const sectionVariants = {
+    hidden: { opacity: 0, y: 40 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: {
+        duration: 0.8,
+        ease: "easeOut",
+        delay: 1.2,
+      },
+    },
+  };
+
+  const cardContainerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.15,
+        delayChildren: 1.4,
+      },
+    },
+  };
+
+  const cardVariants = {
+    hidden: { opacity: 0, y: 30 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: {
+        duration: 0.6,
+        ease: "easeOut",
+      },
+    },
+    hover: {
+      y: -8,
+      transition: { duration: 0.3 },
+    },
+  };
+
+  const features = [
+    {
+      icon: Zap,
+      title: "Real-Time Streaming",
+      description: "Responses stream token-by-token using SSE for a fast and natural conversational experience.",
+    },
+    {
+      icon: MessageSquare,
+      title: "Persistent Multi-Chat",
+      description: "Create, switch, and preserve multiple conversations with local persistence and interruption-safe streaming.",
+    },
+    {
+      icon: Server,
+      title: "Production-Ready Stack",
+      description: "Built with React, FastAPI, OpenRouter, Vercel, and Render using a scalable frontend/backend architecture.",
+    },
+  ];
+
   return (
     <div className="relative min-h-screen w-full overflow-hidden bg-[#0f172a] text-white">
       {/* Static gradient background */}
@@ -207,6 +266,76 @@ export default function LandingPage({ onStartChat }) {
           </div>
         </motion.div>
       </motion.div>
+
+      {/* Why ChatPro Section */}
+      <motion.section
+        className="relative z-10 py-24 px-4 sm:px-6 lg:px-8"
+        initial="hidden"
+        whileInView="visible"
+        viewport={{ once: false, amount: 0.3 }}
+        variants={sectionVariants}
+      >
+        <div className="max-w-6xl mx-auto">
+          {/* Section Header */}
+          <div className="text-center mb-16">
+            <motion.div
+              className="inline-flex items-center rounded-full border border-blue-500/30 bg-blue-500/10 px-4 py-2 backdrop-blur-md mb-4"
+              variants={badgeVariants}
+            >
+              <span className="text-sm font-medium text-blue-300">Why ChatPro</span>
+            </motion.div>
+
+            <motion.h2
+              className="text-4xl sm:text-5xl font-bold tracking-tight mb-6"
+              variants={headlineVariants}
+            >
+              <span className="text-white">Built Like a Real AI Product.</span>
+            </motion.h2>
+
+            <motion.p
+              className="text-lg text-slate-300 max-w-2xl mx-auto"
+              variants={itemVariants}
+            >
+              ChatPro focuses on real-time AI streaming, persistent multi-chat workflows, production-grade architecture, and a smooth user experience.
+            </motion.p>
+          </div>
+
+          {/* Feature Cards Grid */}
+          <motion.div
+            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+            variants={cardContainerVariants}
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: false, amount: 0.2 }}
+          >
+            {features.map((feature, index) => {
+              const Icon = feature.icon;
+              return (
+                <motion.div
+                  key={index}
+                  className="group relative rounded-2xl border border-slate-700/50 bg-gradient-to-br from-slate-800/40 to-slate-900/40 p-8 backdrop-blur-lg transition-all duration-300 hover:border-blue-500/50 hover:shadow-lg hover:shadow-blue-500/20"
+                  variants={cardVariants}
+                  whileHover="hover"
+                >
+                  {/* Card glow on hover */}
+                  <div className="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-gradient-to-br from-blue-500/10 to-indigo-500/10 pointer-events-none" />
+
+                  {/* Icon */}
+                  <div className="relative z-10 mb-6 inline-flex rounded-lg bg-blue-500/10 p-3 group-hover:bg-blue-500/20 transition-all duration-300">
+                    <Icon className="h-6 w-6 text-blue-400 group-hover:text-blue-300 transition-colors duration-300" />
+                  </div>
+
+                  {/* Content */}
+                  <div className="relative z-10">
+                    <h3 className="text-xl font-semibold text-white mb-3">{feature.title}</h3>
+                    <p className="text-slate-300 text-sm leading-relaxed">{feature.description}</p>
+                  </div>
+                </motion.div>
+              );
+            })}
+          </motion.div>
+        </div>
+      </motion.section>
     </div>
   );
 }
