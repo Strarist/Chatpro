@@ -7,26 +7,14 @@ export default function LandingPage({ onStartChat }) {
     visible: {
       opacity: 1,
       transition: {
-        staggerChildren: 0.2,
-        delayChildren: 0.3,
+        staggerChildren: 0.15,
+        delayChildren: 0.2,
       },
     },
   };
 
   const itemVariants = {
-    hidden: { opacity: 0, y: 20 },
-    visible: {
-      opacity: 1,
-      y: 0,
-      transition: {
-        duration: 0.8,
-        ease: "easeOut",
-      },
-    },
-  };
-
-  const badgeVariants = {
-    hidden: { opacity: 0, y: -20 },
+    hidden: { opacity: 0, y: 15 },
     visible: {
       opacity: 1,
       y: 0,
@@ -37,15 +25,27 @@ export default function LandingPage({ onStartChat }) {
     },
   };
 
-  const headlineVariants = {
-    hidden: { opacity: 0, y: 40 },
+  const badgeVariants = {
+    hidden: { opacity: 0, y: -15 },
     visible: {
       opacity: 1,
       y: 0,
       transition: {
-        duration: 0.9,
+        duration: 0.5,
         ease: "easeOut",
-        delay: 0.2,
+      },
+    },
+  };
+
+  const headlineVariants = {
+    hidden: { opacity: 0, y: 30 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: {
+        duration: 0.7,
+        ease: "easeOut",
+        delay: 0.1,
       },
     },
   };
@@ -56,9 +56,9 @@ export default function LandingPage({ onStartChat }) {
       opacity: 1,
       scale: 1,
       transition: {
-        duration: 0.6,
+        duration: 0.5,
         ease: "easeOut",
-        delay: 0.5,
+        delay: 0.4,
       },
     },
     hover: {
@@ -68,14 +68,14 @@ export default function LandingPage({ onStartChat }) {
   };
 
   const panelVariants = {
-    hidden: { opacity: 0, y: 20 },
+    hidden: { opacity: 0, y: 15 },
     visible: {
       opacity: 1,
       y: 0,
       transition: {
-        duration: 0.8,
+        duration: 0.6,
         ease: "easeOut",
-        delay: 0.8,
+        delay: 0.6,
       },
     },
   };
@@ -118,14 +118,13 @@ export default function LandingPage({ onStartChat }) {
   };
 
   const sectionVariants = {
-    hidden: { opacity: 0, y: 40 },
+    hidden: { opacity: 0, y: 30 },
     visible: {
       opacity: 1,
       y: 0,
       transition: {
-        duration: 0.8,
+        duration: 0.7,
         ease: "easeOut",
-        delay: 1.2,
       },
     },
   };
@@ -135,19 +134,18 @@ export default function LandingPage({ onStartChat }) {
     visible: {
       opacity: 1,
       transition: {
-        staggerChildren: 0.15,
-        delayChildren: 1.4,
+        staggerChildren: 0.1,
       },
     },
   };
 
   const cardVariants = {
-    hidden: { opacity: 0, y: 30 },
+    hidden: { opacity: 0, y: 20 },
     visible: {
       opacity: 1,
       y: 0,
       transition: {
-        duration: 0.6,
+        duration: 0.5,
         ease: "easeOut",
       },
     },
@@ -176,7 +174,7 @@ export default function LandingPage({ onStartChat }) {
   ];
 
   return (
-    <div className="relative min-h-screen w-full overflow-hidden bg-[#0f172a] text-white">
+    <div className="relative w-full overflow-hidden bg-[#0f172a] text-white">
       {/* Static gradient background */}
       <div className="absolute inset-0 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950" />
 
@@ -199,15 +197,14 @@ export default function LandingPage({ onStartChat }) {
         animate="animate"
       />
 
-      {/* Content */}
+      {/* === HERO SECTION === */}
       <motion.div
         className="relative z-10 flex min-h-screen flex-col items-center justify-center px-4 py-20 sm:px-6 lg:px-8"
         initial="hidden"
         animate="visible"
         variants={containerVariants}
       >
-        {/* Hero Section */}
-        <div className="w-full max-w-2xl space-y-8 text-center">
+        <div className="w-full max-w-2xl space-y-6 text-center">
           {/* Badge */}
           <motion.div
             className="inline-flex items-center rounded-full border border-blue-500/30 bg-blue-500/10 px-4 py-2 backdrop-blur-md"
@@ -239,7 +236,7 @@ export default function LandingPage({ onStartChat }) {
 
           {/* CTA Button */}
           <motion.div
-            className="flex justify-center pt-6"
+            className="flex justify-center pt-4"
             variants={buttonVariants}
             whileHover="hover"
           >
@@ -256,7 +253,7 @@ export default function LandingPage({ onStartChat }) {
 
         {/* Glassmorphism Feature Card */}
         <motion.div
-          className="mt-20 w-full max-w-2xl"
+          className="mt-12 w-full max-w-2xl"
           variants={panelVariants}
         >
           <div className="rounded-2xl border border-slate-700/50 bg-slate-900/30 p-8 backdrop-blur-lg shadow-2xl">
@@ -267,20 +264,23 @@ export default function LandingPage({ onStartChat }) {
         </motion.div>
       </motion.div>
 
-      {/* Why ChatPro Section */}
+      {/* === WHY CHATPRO SECTION === */}
       <motion.section
-        className="relative z-10 py-24 px-4 sm:px-6 lg:px-8"
+        className="relative z-10 py-16 px-4 sm:px-6 lg:px-8"
         initial="hidden"
         whileInView="visible"
-        viewport={{ once: false, amount: 0.3 }}
+        viewport={{ once: false, amount: 0.4 }}
         variants={sectionVariants}
       >
         <div className="max-w-6xl mx-auto">
           {/* Section Header */}
-          <div className="text-center mb-16">
+          <div className="text-center mb-12">
             <motion.div
               className="inline-flex items-center rounded-full border border-blue-500/30 bg-blue-500/10 px-4 py-2 backdrop-blur-md mb-4"
               variants={badgeVariants}
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: false, amount: 0.5 }}
             >
               <span className="text-sm font-medium text-blue-300">Why ChatPro</span>
             </motion.div>
@@ -288,6 +288,9 @@ export default function LandingPage({ onStartChat }) {
             <motion.h2
               className="text-4xl sm:text-5xl font-bold tracking-tight mb-6"
               variants={headlineVariants}
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: false, amount: 0.5 }}
             >
               <span className="text-white">Built Like a Real AI Product.</span>
             </motion.h2>
@@ -295,6 +298,9 @@ export default function LandingPage({ onStartChat }) {
             <motion.p
               className="text-lg text-slate-300 max-w-2xl mx-auto"
               variants={itemVariants}
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: false, amount: 0.5 }}
             >
               ChatPro focuses on real-time AI streaming, persistent multi-chat workflows, production-grade architecture, and a smooth user experience.
             </motion.p>
@@ -306,7 +312,7 @@ export default function LandingPage({ onStartChat }) {
             variants={cardContainerVariants}
             initial="hidden"
             whileInView="visible"
-            viewport={{ once: false, amount: 0.2 }}
+            viewport={{ once: false, amount: 0.3 }}
           >
             {features.map((feature, index) => {
               const Icon = feature.icon;
@@ -333,6 +339,81 @@ export default function LandingPage({ onStartChat }) {
                 </motion.div>
               );
             })}
+          </motion.div>
+        </div>
+      </motion.section>
+
+      {/* === FINAL CTA SECTION === */}
+      <motion.section
+        className="relative z-10 py-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-slate-900/0 via-blue-600/5 to-slate-900/20"
+        initial="hidden"
+        whileInView="visible"
+        viewport={{ once: false, amount: 0.4 }}
+        variants={sectionVariants}
+      >
+        {/* Decorative orb */}
+        <motion.div
+          className="absolute -top-32 left-1/2 -translate-x-1/2 w-64 h-64 bg-blue-500 rounded-full blur-3xl opacity-10"
+          animate={{
+            y: [0, -20, 0],
+            transition: {
+              duration: 6,
+              repeat: Infinity,
+              ease: "easeInOut",
+            },
+          }}
+        />
+
+        <div className="max-w-3xl mx-auto text-center relative z-10">
+          {/* Badge */}
+          <motion.div
+            className="inline-flex items-center rounded-full border border-blue-500/30 bg-blue-500/10 px-4 py-2 backdrop-blur-md mb-6"
+            variants={badgeVariants}
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: false, amount: 0.5 }}
+          >
+            <span className="text-sm font-medium text-blue-300">Ready to Experience It?</span>
+          </motion.div>
+
+          {/* Heading */}
+          <motion.h2
+            className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight mb-6 text-white"
+            variants={headlineVariants}
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: false, amount: 0.5 }}
+          >
+            Start Conversations That Feel Instant.
+          </motion.h2>
+
+          {/* Supporting text */}
+          <motion.p
+            className="text-lg text-slate-300 max-w-2xl mx-auto mb-8"
+            variants={itemVariants}
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: false, amount: 0.5 }}
+          >
+            Built for real-time AI interaction with smooth streaming, persistent chats, and production-grade responsiveness.
+          </motion.p>
+
+          {/* CTA Button */}
+          <motion.div
+            variants={buttonVariants}
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: false, amount: 0.5 }}
+            whileHover="hover"
+          >
+            <motion.button
+              onClick={onStartChat}
+              className="px-8 py-4 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-lg font-semibold text-white shadow-lg shadow-blue-500/50 hover:shadow-blue-400/70 transition-all duration-300"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              Launch ChatPro
+            </motion.button>
           </motion.div>
         </div>
       </motion.section>
