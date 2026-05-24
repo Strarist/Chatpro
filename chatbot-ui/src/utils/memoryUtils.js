@@ -1,7 +1,7 @@
-const MEMORY_KEY = 'memory';
+const MEMORY_KEY = "memory";
 
 export function getMemory() {
-  if (typeof window === 'undefined' || !window.localStorage) {
+  if (typeof window === "undefined" || !window.localStorage) {
     return {};
   }
 
@@ -12,14 +12,14 @@ export function getMemory() {
 
   try {
     const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === 'object' ? parsed : {};
+    return parsed && typeof parsed === "object" ? parsed : {};
   } catch {
     return {};
   }
 }
 
 export function extractMemoryFromMessage(message) {
-  if (typeof message !== 'string') {
+  if (typeof message !== "string") {
     return null;
   }
 
@@ -39,7 +39,7 @@ export function extractMemoryFromMessage(message) {
 }
 
 export function updateMemory(newData) {
-  if (typeof window === 'undefined' || !window.localStorage) {
+  if (typeof window === "undefined" || !window.localStorage) {
     return {};
   }
 

@@ -60,9 +60,11 @@ const InputBox = ({ value, setValue, onSend, onStop, isLoading }) => {
       className={`
         flex min-w-0 items-end gap-2 rounded-2xl px-3 py-3 sm:gap-3 sm:px-4 sm:py-3.5
         bg-slate-800/40 border backdrop-blur-md transition-all duration-300 ease-out
-        ${isFocused
-          ? "border-blue-500/50 shadow-lg shadow-blue-500/20 ring-1 ring-blue-500/30 bg-slate-800/60"
-          : "border-slate-700/40 shadow-md shadow-black/20"}
+        ${
+          isFocused
+            ? "border-blue-500/50 shadow-lg shadow-blue-500/20 ring-1 ring-blue-500/30 bg-slate-800/60"
+            : "border-slate-700/40 shadow-md shadow-black/20"
+        }
       `}
     >
       {/* TEXTAREA */}

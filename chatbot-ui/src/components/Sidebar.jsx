@@ -1,12 +1,6 @@
 import AppLogo from "./AppLogo";
 
-const Sidebar = ({
-  chats,
-  activeChatId,
-  setActiveChatId,
-  createNewChat,
-  deleteChat,
-}) => {
+const Sidebar = ({ chats, activeChatId, setActiveChatId, createNewChat, deleteChat }) => {
   return (
     <div className="flex h-full w-44 shrink-0 flex-col border-r border-slate-700/40 bg-gradient-to-b from-slate-900 via-slate-900/95 to-slate-900 sm:w-52 md:w-60 lg:w-64 backdrop-blur-xl">
       {/* New Chat Button */}
@@ -36,9 +30,7 @@ const Sidebar = ({
             }`}
           >
             {/* Title */}
-            <span className="min-w-0 flex-1 truncate font-medium">
-              {chat.title}
-            </span>
+            <span className="min-w-0 flex-1 truncate font-medium">{chat.title}</span>
 
             {/* Delete Button */}
             <button

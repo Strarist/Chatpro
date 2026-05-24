@@ -20,9 +20,7 @@ export const useChat = () => {
       id: generateId(),
       role: "user",
       content,
-      parentId: messages.length
-        ? messages[messages.length - 1].id
-        : null,
+      parentId: messages.length ? messages[messages.length - 1].id : null,
     };
     setMessages((prev) => [...prev, userMsg]);
 
@@ -34,17 +32,15 @@ export const useChat = () => {
     try {
       const memory = getMemory();
       const recentMessages = [...messages, userMsg].slice(-8);
-      const requestMessages = memory && typeof memory.name === "string" && memory.name.trim()
-        ? [{ role: "system", content: `User name is ${memory.name.trim()}` }, ...recentMessages]
-        : recentMessages;
+      const requestMessages =
+        memory && typeof memory.name === "string" && memory.name.trim()
+          ? [{ role: "system", content: `User name is ${memory.name.trim()}` }, ...recentMessages]
+          : recentMessages;
       const aiResponse = await fetchAIResponse(requestMessages);
 
       // 🔥 Step 1: Add empty AI message
       let currentText = "";
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", content: "" },
-      ]);
+      setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
 
       // 🔥 Step 2: Simulate streaming
       for (let i = 0; i < aiResponse.length; i++) {

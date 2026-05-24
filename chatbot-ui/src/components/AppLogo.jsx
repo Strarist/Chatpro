@@ -15,12 +15,7 @@ const AppLogo = ({ size = "md" }) => {
     <div
       className={`flex shrink-0 items-center justify-center rounded-lg border border-blue-400/20 bg-[#081428] text-blue-300 shadow-sm shadow-blue-950/20 ${sizeClasses[size]}`}
     >
-      <svg
-        viewBox="0 0 24 24"
-        className={iconClasses[size]}
-        fill="none"
-        aria-hidden="true"
-      >
+      <svg viewBox="0 0 24 24" className={iconClasses[size]} fill="none" aria-hidden="true">
         <path
           d="M13 3 6 13h5l-1 8 8-11h-5l1-7Z"
           stroke="currentColor"

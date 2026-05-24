@@ -159,17 +159,20 @@ export default function LandingPage({ onStartChat }) {
     {
       icon: Zap,
       title: "Real-Time Streaming",
-      description: "Responses stream token-by-token using SSE for a fast and natural conversational experience.",
+      description:
+        "Responses stream token-by-token using SSE for a fast and natural conversational experience.",
     },
     {
       icon: MessageSquare,
       title: "Persistent Multi-Chat",
-      description: "Create, switch, and preserve multiple conversations with local persistence and interruption-safe streaming.",
+      description:
+        "Create, switch, and preserve multiple conversations with local persistence and interruption-safe streaming.",
     },
     {
       icon: Server,
       title: "Production-Ready Stack",
-      description: "Built with React, FastAPI, OpenRouter, Vercel, and Render using a scalable frontend/backend architecture.",
+      description:
+        "Built with React, FastAPI, OpenRouter, Vercel, and Render using a scalable frontend/backend architecture.",
     },
   ];
 
@@ -286,10 +289,7 @@ export default function LandingPage({ onStartChat }) {
         </div>
 
         {/* Glassmorphism Feature Card */}
-        <motion.div
-          className="mt-12 w-full max-w-2xl"
-          variants={panelVariants}
-        >
+        <motion.div className="mt-12 w-full max-w-2xl" variants={panelVariants}>
           <div className="rounded-2xl border border-slate-700/50 bg-slate-900/30 p-8 backdrop-blur-lg shadow-2xl">
             <p className="text-center text-sm text-slate-400">
               Built with modern web technologies • Real-time streaming • Production-ready
@@ -355,7 +355,8 @@ export default function LandingPage({ onStartChat }) {
                       animate={{ opacity: 1 }}
                       transition={{ duration: 0.5, delay: 0.3 }}
                     >
-                      Quantum computing uses qubits instead of regular bits, allowing computers to process multiple possibilities simultaneously.
+                      Quantum computing uses qubits instead of regular bits, allowing computers to
+                      process multiple possibilities simultaneously.
                     </motion.span>
 
                     <motion.div
@@ -363,7 +364,11 @@ export default function LandingPage({ onStartChat }) {
                       animate={{ opacity: 1 }}
                       transition={{ duration: 0.5, delay: 0.9 }}
                     >
-                      <span> This makes certain complex calculations dramatically faster than traditional computing.</span>
+                      <span>
+                        {" "}
+                        This makes certain complex calculations dramatically faster than traditional
+                        computing.
+                      </span>
                     </motion.div>
 
                     {/* Typing indicator */}
@@ -437,7 +442,8 @@ export default function LandingPage({ onStartChat }) {
               whileInView="visible"
               viewport={{ once: false, amount: 0.5 }}
             >
-              ChatPro focuses on real-time AI streaming, persistent multi-chat workflows, production-grade architecture, and a smooth user experience.
+              ChatPro focuses on real-time AI streaming, persistent multi-chat workflows,
+              production-grade architecture, and a smooth user experience.
             </motion.p>
           </div>
 
@@ -530,7 +536,8 @@ export default function LandingPage({ onStartChat }) {
             whileInView="visible"
             viewport={{ once: false, amount: 0.5 }}
           >
-            Built for real-time AI interaction with smooth streaming, persistent chats, and production-grade responsiveness.
+            Built for real-time AI interaction with smooth streaming, persistent chats, and
+            production-grade responsiveness.
           </motion.p>
 
           {/* CTA Button */}

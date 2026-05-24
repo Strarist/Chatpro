@@ -28,7 +28,9 @@ const markdownComponents = {
       {children}
     </blockquote>
   ),
-  ul: ({ children }) => <ul className="my-3 ml-5 list-disc space-y-2 marker:text-slate-400">{children}</ul>,
+  ul: ({ children }) => (
+    <ul className="my-3 ml-5 list-disc space-y-2 marker:text-slate-400">{children}</ul>
+  ),
   ol: ({ children }) => (
     <ol className="my-3 ml-5 list-decimal space-y-2 marker:text-slate-400">{children}</ol>
   ),
@@ -87,16 +89,24 @@ const markdownComponents = {
   },
   table: ({ children }) => (
     <div className="my-4 overflow-x-auto">
-      <table className="w-full min-w-[28rem] border-collapse text-sm text-slate-200">{children}</table>
+      <table className="w-full min-w-[28rem] border-collapse text-sm text-slate-200">
+        {children}
+      </table>
     </div>
   ),
-  thead: ({ children }) => <thead className="border-b border-slate-600/70 bg-slate-900/65">{children}</thead>,
+  thead: ({ children }) => (
+    <thead className="border-b border-slate-600/70 bg-slate-900/65">{children}</thead>
+  ),
   tbody: ({ children }) => <tbody className="divide-y divide-slate-700/70">{children}</tbody>,
   tr: ({ children }) => <tr className="transition-colors hover:bg-slate-800/40">{children}</tr>,
   th: ({ children }) => (
-    <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-300">{children}</th>
+    <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-300">
+      {children}
+    </th>
   ),
-  td: ({ children }) => <td className="px-3 py-2 align-top leading-6 text-slate-200">{children}</td>,
+  td: ({ children }) => (
+    <td className="px-3 py-2 align-top leading-6 text-slate-200">{children}</td>
+  ),
   input: ({ type, checked }) => {
     if (type === "checkbox") {
       return (
@@ -123,14 +133,13 @@ const MessageBubble = ({
 }) => {
   const [copied, setCopied] = useState(false);
   const [reaction, setReaction] = useState(null);
-
-  if (!message) return null;
-
-  const isUser = message.role === "user";
+  const isUser = message?.role === "user";
+  const messageContent = message?.content ?? "";
+  const isStreaming = Boolean(message?.isStreaming);
 
   const handleCopy = async () => {
     try {
-      await navigator.clipboard.writeText(message.content || "");
+      await navigator.clipboard.writeText(messageContent);
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     } catch (err) {
@@ -139,13 +148,15 @@ const MessageBubble = ({
   };
 
   const finalizedMarkdown = useMemo(() => {
-    if (isUser || message.isStreaming) return null;
+    if (!message || isUser || isStreaming) return null;
     return (
       <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-        {message.content}
+        {messageContent}
       </ReactMarkdown>
     );
-  }, [isUser, message.content, message.isStreaming]);
+  }, [isStreaming, isUser, message, messageContent]);
+
+  if (!message) return null;
 
   return (
     <div
@@ -156,10 +167,10 @@ const MessageBubble = ({
       {isUser ? (
         <div className="flex w-full max-w-4xl flex-col items-end gap-2 px-0.5 sm:px-2">
           <div className="max-w-[90%] rounded-2xl bg-gradient-to-br from-blue-600 to-blue-500 px-4 py-3 text-[15px] leading-relaxed text-white shadow-lg shadow-blue-950/30 transition-all duration-200 ease-out hover:from-blue-500 hover:to-blue-400 hover:shadow-xl hover:shadow-blue-950/40 sm:max-w-[82%] sm:px-5 md:max-w-[74%] lg:max-w-[72%]">
-            {message.content}
+            {messageContent}
           </div>
 
-          {!message.isStreaming && (
+          {!isStreaming && (
             <div className="mr-1 flex gap-3 text-xs text-gray-400 opacity-0 transition-all duration-200 ease-out group-hover:opacity-100">
               <button
                 onClick={handleCopy}
@@ -187,20 +198,20 @@ const MessageBubble = ({
 
           <div className="flex w-full max-w-[90%] flex-col gap-2 sm:max-w-[82%] md:max-w-[74%] lg:max-w-[72%]">
             <div className="w-full overflow-hidden rounded-2xl border border-slate-700/50 bg-slate-800/40 px-4 py-3 text-[15px] text-slate-100 shadow-lg shadow-black/30 break-words transition-all duration-200 ease-out hover:border-slate-600/60 hover:bg-slate-800/50 hover:shadow-xl hover:shadow-black/40 backdrop-blur-md sm:px-5">
-              {message.isStreaming ? (
+              {isStreaming ? (
                 <div className="whitespace-pre-wrap break-words leading-7 text-slate-100">
-                  {message.content}
+                  {messageContent}
                 </div>
               ) : (
                 <div className="animate-in fade-in duration-150">{finalizedMarkdown}</div>
               )}
 
-              {message.isStreaming && (
+              {isStreaming && (
                 <span className="ml-0.5 inline-block h-[1em] w-[2px] rounded-full bg-blue-300/80 align-[-0.125em] animate-pulse" />
               )}
             </div>
 
-            {!message.isStreaming && (
+            {!isStreaming && (
               <>
                 <div className="ml-1 flex items-center gap-3 text-xs text-gray-400 opacity-0 transition-all duration-200 ease-out group-hover:opacity-100">
                   <button

@@ -17,11 +17,7 @@ const API_URL = (() => {
  * @param {Function} onChunk - Called with the progressively built response text.
  * @param {AbortController} controller - Optional abort controller.
  */
-export const streamAIResponse = async (
-  messages,
-  onChunk,
-  controller
-) => {
+export const streamAIResponse = async (messages, onChunk, controller) => {
   const res = await fetch(`${API_URL}/chat`, {
     method: "POST",
     headers: {
@@ -36,10 +32,7 @@ export const streamAIResponse = async (
 
     try {
       const errorData = await res.json();
-      errorMessage =
-        errorData?.error?.message ||
-        errorData?.detail ||
-        errorMessage;
+      errorMessage = errorData?.error?.message || errorData?.detail || errorMessage;
     } catch {
       // Ignore JSON parsing failures
     }
@@ -61,12 +54,7 @@ export const streamAIResponse = async (
 
   const extractPrimaryText = (choice) => {
     const delta = choice?.delta ?? {};
-    const candidates = [
-      delta.content,
-      choice?.message?.content,
-      delta.text,
-      choice?.text,
-    ];
+    const candidates = [delta.content, choice?.message?.content, delta.text, choice?.text];
 
     for (const value of candidates) {
       if (typeof value === "string" && value.length > 0) {
@@ -89,9 +77,7 @@ export const streamAIResponse = async (
       return "";
     }
 
-    return details
-      .map((item) => (typeof item?.summary === "string" ? item.summary : ""))
-      .join("");
+    return details.map((item) => (typeof item?.summary === "string" ? item.summary : "")).join("");
   };
 
   const processLine = (rawLine) => {

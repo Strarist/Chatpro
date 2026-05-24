@@ -5,13 +5,11 @@ import LandingPage from "./pages/LandingPage";
 
 const isLocalhost =
   typeof window !== "undefined" &&
-  (window.location.hostname === "localhost" ||
-    window.location.hostname === "127.0.0.1");
+  (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
 
 const API_URL = isLocalhost
   ? "http://localhost:8000"
-  : (import.meta.env.VITE_API_URL ||
-      "https://chatpro-backend-lxvu.onrender.com");
+  : import.meta.env.VITE_API_URL || "https://chatpro-backend-lxvu.onrender.com";
 
 if (typeof window !== "undefined") {
   window.API_URL = API_URL;
@@ -104,9 +102,7 @@ function App() {
         if (chat.id !== activeChat.id) return chat;
 
         const resolved =
-          typeof newMessages === "function"
-            ? newMessages(chat.messages)
-            : newMessages;
+          typeof newMessages === "function" ? newMessages(chat.messages) : newMessages;
 
         if (!Array.isArray(resolved)) return chat;
 
@@ -116,8 +112,7 @@ function App() {
           const firstUser = resolved.find((m) => m.role === "user");
           if (firstUser?.content) {
             updatedTitle =
-              firstUser.content.slice(0, 40).trim() +
-              (firstUser.content.length > 40 ? "..." : "");
+              firstUser.content.slice(0, 40).trim() + (firstUser.content.length > 40 ? "..." : "");
           }
         }
 
@@ -186,9 +181,7 @@ function App() {
           <div className="flex flex-1 items-center justify-center text-gray-400">
             <div className="text-center">
               <h2 className="mb-2 text-lg">No chats yet</h2>
-              <p className="text-sm">
-                Click "New Chat" to start a conversation
-              </p>
+              <p className="text-sm">Click &quot;New Chat&quot; to start a conversation</p>
             </div>
           </div>
         )}

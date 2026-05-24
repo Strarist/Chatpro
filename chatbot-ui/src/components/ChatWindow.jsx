@@ -1,6 +1,6 @@
 import MessageBubble from "./MessageBubble";
 import InputBox from "./InputBox";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { streamAIResponse } from "../services/aiService";
 import AppLogo from "./AppLogo";
 
@@ -21,30 +21,19 @@ const ChatWindow = ({ messages = [], setMessages }) => {
   const shouldAutoScrollRef = useRef(true);
   const forceAutoScrollRef = useRef(false);
 
-  const isNearBottom = (el, threshold = AUTO_SCROLL_THRESHOLD) => {
+  const isNearBottom = useCallback((el, threshold = AUTO_SCROLL_THRESHOLD) => {
     if (!el) return true;
     return el.scrollHeight - el.scrollTop - el.clientHeight < threshold;
-  };
+  }, []);
 
-  const scrollToBottom = (behavior = "auto") => {
+  const scrollToBottom = useCallback((behavior = "auto") => {
     const el = containerRef.current;
     if (!el) return;
     el.scrollTo({ top: el.scrollHeight, behavior });
     shouldAutoScrollRef.current = true;
-  };
-
-  useEffect(() => {
-    isMountedRef.current = true;
-    return () => {
-      isMountedRef.current = false;
-      if (controllerRef.current) {
-        controllerRef.current.abort();
-        finalizeStreamingResponse();
-      }
-    };
   }, []);
 
-  const finalizeStreamingResponse = () => {
+  const finalizeStreamingResponse = useCallback(() => {
     setMessages((prev) => {
       const updated = [...prev];
       const lastMsg = updated[updated.length - 1];
@@ -57,7 +46,18 @@ const ChatWindow = ({ messages = [], setMessages }) => {
       }
       return updated;
     });
-  };
+  }, [setMessages]);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      if (controllerRef.current) {
+        controllerRef.current.abort();
+        finalizeStreamingResponse();
+      }
+    };
+  }, [finalizeStreamingResponse]);
 
   useEffect(() => {
     const handleBeforeUnload = () => {
@@ -71,7 +71,7 @@ const ChatWindow = ({ messages = [], setMessages }) => {
     return () => {
       window.removeEventListener("beforeunload", handleBeforeUnload);
     };
-  }, []);
+  }, [finalizeStreamingResponse]);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -94,10 +94,11 @@ const ChatWindow = ({ messages = [], setMessages }) => {
     if (latestMessage?.role === "assistant") {
       setShowJumpToLatest(true);
     }
-  }, [messages]);
+  }, [isNearBottom, messages, scrollToBottom]);
 
+  const hasMessages = messages.length > 0;
   useEffect(() => {
-    if (!messages.length) {
+    if (!hasMessages) {
       setShowJumpToLatest(false);
       shouldAutoScrollRef.current = true;
       return;
@@ -120,15 +121,16 @@ const ChatWindow = ({ messages = [], setMessages }) => {
     return () => {
       el.removeEventListener("scroll", handleScroll);
     };
-  }, [messages.length > 0]);
+  }, [hasMessages, isNearBottom]);
 
+  const firstMessageId = hasMessages ? messages[0]?.id : null;
   useEffect(() => {
     if (controllerRef.current && isLoading) {
       controllerRef.current.abort();
       finalizeStreamingResponse();
       setIsLoading(false);
     }
-  }, [messages.length > 0 ? messages[0]?.id : null]);
+  }, [finalizeStreamingResponse, firstMessageId, isLoading]);
 
   const generateId = () => {
     return "msg_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8);
@@ -251,10 +253,7 @@ const ChatWindow = ({ messages = [], setMessages }) => {
       if (isMountedRef.current && requestId === activeRequestIdRef.current) {
         setIsLoading(false);
       }
-      if (
-        controllerRef.current?.signal?.aborted ||
-        requestId === activeRequestIdRef.current
-      ) {
+      if (controllerRef.current?.signal?.aborted || requestId === activeRequestIdRef.current) {
         controllerRef.current = null;
       }
     }
@@ -408,9 +407,7 @@ const ChatWindow = ({ messages = [], setMessages }) => {
 
   const canRegenerate = (msg, index) => {
     const parentKey = getAssistantParentKey(msg, index);
-    return parentKey
-      ? parentKey === latestAssistantParentKey
-      : index === latestAssistantIndex;
+    return parentKey ? parentKey === latestAssistantParentKey : index === latestAssistantIndex;
   };
 
   return (
