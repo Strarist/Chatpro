@@ -54,8 +54,45 @@ export const streamAIResponse = async (
   const reader = res.body.getReader();
   const decoder = new TextDecoder("utf-8");
 
-  let fullText = "";
+  let primaryText = "";
+  let fallbackText = "";
+  let hasPrimaryText = false;
   let buffer = "";
+
+  const extractPrimaryText = (choice) => {
+    const delta = choice?.delta ?? {};
+    const candidates = [
+      delta.content,
+      choice?.message?.content,
+      delta.text,
+      choice?.text,
+    ];
+
+    for (const value of candidates) {
+      if (typeof value === "string" && value.length > 0) {
+        return value;
+      }
+    }
+
+    return "";
+  };
+
+  const extractFallbackText = (choice) => {
+    const delta = choice?.delta ?? {};
+
+    if (typeof delta.reasoning === "string" && delta.reasoning.length > 0) {
+      return delta.reasoning;
+    }
+
+    const details = delta.reasoning_details;
+    if (!Array.isArray(details)) {
+      return "";
+    }
+
+    return details
+      .map((item) => (typeof item?.summary === "string" ? item.summary : ""))
+      .join("");
+  };
 
   const processLine = (rawLine) => {
     const line = rawLine.trim();
@@ -75,13 +112,26 @@ export const streamAIResponse = async (
       return;
     }
 
-    const deltaText = json.choices?.[0]?.delta?.content;
-    const messageText = json.choices?.[0]?.message?.content;
-    const text = deltaText ?? messageText;
+    if (json?.error?.message) {
+      throw new Error(json.error.message);
+    }
 
-    if (typeof text === "string" && text.length > 0) {
-      fullText += text;
-      onChunk(fullText);
+    const choice = json?.choices?.[0];
+    const text = extractPrimaryText(choice);
+
+    if (text) {
+      hasPrimaryText = true;
+      primaryText += text;
+      onChunk(primaryText);
+      return;
+    }
+
+    if (!hasPrimaryText) {
+      const fallback = extractFallbackText(choice);
+      if (fallback) {
+        fallbackText += fallback;
+        onChunk(fallbackText);
+      }
     }
   };
 
@@ -106,5 +156,5 @@ export const streamAIResponse = async (
     processLine(buffer);
   }
 
-  return fullText;
+  return hasPrimaryText ? primaryText : fallbackText;
 };
