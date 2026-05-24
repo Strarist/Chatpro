@@ -1,28 +1,152 @@
 import MessageBubble from "./MessageBubble";
 import InputBox from "./InputBox";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { streamAIResponse } from "../services/aiService";
+import { ModelSelector } from "./ModelSelector";
+import { useModelSelection } from "../hooks/useModelSelection";
+import { getModel } from "../config/models";
+import { useMarkdownProcessor } from "../utils/markdownProcessor";
 import AppLogo from "./AppLogo";
 
 const AUTO_SCROLL_THRESHOLD = 150;
+const IS_DEV = import.meta.env.DEV;
+const STREAM_STATUS = Object.freeze({
+  IDLE: "idle",
+  STARTING: "starting",
+  STREAMING: "streaming",
+  FINALIZING: "finalizing",
+  COMPLETED: "completed",
+  ABORTED: "aborted",
+  ERROR: "error",
+});
 
-const ChatWindow = ({ messages = [], setMessages }) => {
+const ChatWindow = ({ messages = [], conversationId, setMessages, onOpenSidebar }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [editingIndex, setEditingIndex] = useState(null);
   const [editingText, setEditingText] = useState("");
   const [input, setInput] = useState("");
   const [activeVersionMap, setActiveVersionMap] = useState({});
   const [showJumpToLatest, setShowJumpToLatest] = useState(false);
+  const [streamStatus, setStreamStatus] = useState(STREAM_STATUS.IDLE);
+  const [devStreamMetrics, setDevStreamMetrics] = useState(null);
+
+  // Model selection
+  const { selectedModelKey, handleModelChange } = useModelSelection();
+
+  // Markdown processor
+  const { processMarkdown } = useMarkdownProcessor();
 
   const containerRef = useRef(null);
   const controllerRef = useRef(null);
   const activeRequestIdRef = useRef(0);
+  const streamSessionRef = useRef(null);
   const isMountedRef = useRef(true);
   const isLoadingRef = useRef(false);
   const shouldAutoScrollRef = useRef(true);
   const forceAutoScrollRef = useRef(false);
   const finalizeStreamingResponseRef = useRef(() => {});
   const previousFirstMessageIdRef = useRef(null);
+  const orphanLoadingTimerRef = useRef(null);
+  const devInvariantKeysRef = useRef(new Set());
+  const streamPerfRef = useRef({
+    requestId: null,
+    sessionId: null,
+    mode: "send",
+    startedAt: null,
+    firstTokenAt: null,
+    finalizeStartedAt: null,
+    latestContentLength: 0,
+  });
+
+  const now = useCallback(() => {
+    if (typeof performance !== "undefined" && typeof performance.now === "function") {
+      return performance.now();
+    }
+    return Date.now();
+  }, []);
+
+  const devInvariant = useCallback((key, message, context) => {
+    if (!IS_DEV) return;
+    if (devInvariantKeysRef.current.has(key)) return;
+    devInvariantKeysRef.current.add(key);
+    console.warn(`[stream-invariant] ${message}`, context ?? {});
+  }, []);
+
+  const beginStreamMetrics = useCallback(
+    (requestId, sessionId, mode) => {
+      streamPerfRef.current = {
+        requestId,
+        sessionId,
+        mode,
+        startedAt: now(),
+        firstTokenAt: null,
+        finalizeStartedAt: null,
+        latestContentLength: 0,
+      };
+      if (IS_DEV) {
+        setDevStreamMetrics(null);
+      }
+    },
+    [now]
+  );
+
+  const markFirstToken = useCallback(
+    (incomingText) => {
+      const metrics = streamPerfRef.current;
+      metrics.latestContentLength = incomingText.length;
+      if (metrics.firstTokenAt === null && incomingText.length > 0) {
+        metrics.firstTokenAt = now();
+        setStreamStatus(STREAM_STATUS.STREAMING);
+      }
+    },
+    [now]
+  );
+
+  const markFinalizing = useCallback(() => {
+    const metrics = streamPerfRef.current;
+    if (metrics.finalizeStartedAt !== null) {
+      devInvariant("duplicate-finalize", "Duplicate finalize transition prevented", {
+        requestId: metrics.requestId,
+        sessionId: metrics.sessionId,
+      });
+      return;
+    }
+    metrics.finalizeStartedAt = now();
+    setStreamStatus(STREAM_STATUS.FINALIZING);
+  }, [devInvariant, now]);
+
+  const publishDevMetrics = useCallback(
+    (status) => {
+      if (!IS_DEV) return;
+      const metrics = streamPerfRef.current;
+      if (metrics.startedAt === null) return;
+
+      const finishedAt = now();
+      const ttftMs =
+        metrics.firstTokenAt !== null ? metrics.firstTokenAt - metrics.startedAt : null;
+      const durationMs = finishedAt - metrics.startedAt;
+      const activeStreamMs =
+        metrics.firstTokenAt !== null ? Math.max(finishedAt - metrics.firstTokenAt, 1) : 1;
+      const throughputPerSec =
+        metrics.latestContentLength > 0
+          ? (metrics.latestContentLength / (activeStreamMs / 1000)).toFixed(1)
+          : "0.0";
+      const finalizeMs =
+        metrics.finalizeStartedAt !== null ? finishedAt - metrics.finalizeStartedAt : null;
+
+      setDevStreamMetrics({
+        mode: metrics.mode,
+        requestId: metrics.requestId,
+        status,
+        chars: metrics.latestContentLength,
+        ttftMs,
+        durationMs,
+        finalizeMs,
+        throughputPerSec,
+      });
+    },
+    [now]
+  );
 
   const isNearBottom = useCallback((el, threshold = AUTO_SCROLL_THRESHOLD) => {
     if (!el) return true;
@@ -34,6 +158,31 @@ const ChatWindow = ({ messages = [], setMessages }) => {
     if (!el) return;
     el.scrollTo({ top: el.scrollHeight, behavior });
     shouldAutoScrollRef.current = true;
+  }, []);
+
+  const createStreamSessionId = useCallback(() => {
+    if (typeof window !== "undefined" && window.crypto?.randomUUID) {
+      return window.crypto.randomUUID();
+    }
+    return `stream_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+  }, []);
+
+  const beginStreamSession = useCallback(() => {
+    const sessionId = createStreamSessionId();
+    streamSessionRef.current = sessionId;
+    return sessionId;
+  }, [createStreamSessionId]);
+
+  const invalidateStreamSession = useCallback(() => {
+    streamSessionRef.current = null;
+  }, []);
+
+  const isActiveStreamSession = useCallback((requestId, sessionId) => {
+    return (
+      isMountedRef.current &&
+      activeRequestIdRef.current === requestId &&
+      streamSessionRef.current === sessionId
+    );
   }, []);
 
   const finalizeStreamingResponse = useCallback(() => {
@@ -51,6 +200,10 @@ const ChatWindow = ({ messages = [], setMessages }) => {
     });
   }, [setMessages]);
 
+  const transitionToStatus = useCallback((status) => {
+    setStreamStatus((prev) => (prev === status ? prev : status));
+  }, []);
+
   useEffect(() => {
     finalizeStreamingResponseRef.current = finalizeStreamingResponse;
   }, [finalizeStreamingResponse]);
@@ -60,29 +213,63 @@ const ChatWindow = ({ messages = [], setMessages }) => {
   }, [isLoading]);
 
   useEffect(() => {
+    if (!IS_DEV) return;
+
+    if (!isLoading) {
+      if (orphanLoadingTimerRef.current) {
+        clearTimeout(orphanLoadingTimerRef.current);
+        orphanLoadingTimerRef.current = null;
+      }
+      return;
+    }
+
+    orphanLoadingTimerRef.current = setTimeout(() => {
+      if (isLoadingRef.current && !controllerRef.current) {
+        devInvariant("orphan-loading", "Loading state active without an attached stream controller", {
+          streamStatus,
+          requestId: activeRequestIdRef.current,
+        });
+      }
+    }, 2000);
+
+    return () => {
+      if (orphanLoadingTimerRef.current) {
+        clearTimeout(orphanLoadingTimerRef.current);
+        orphanLoadingTimerRef.current = null;
+      }
+    };
+  }, [devInvariant, isLoading, streamStatus]);
+
+  useEffect(() => {
     isMountedRef.current = true;
     return () => {
       isMountedRef.current = false;
       if (controllerRef.current) {
+        invalidateStreamSession();
         controllerRef.current.abort();
         finalizeStreamingResponseRef.current();
+        transitionToStatus(STREAM_STATUS.ABORTED);
+        publishDevMetrics(STREAM_STATUS.ABORTED);
       }
     };
-  }, []);
+  }, [invalidateStreamSession, publishDevMetrics, transitionToStatus]);
 
   useEffect(() => {
     const handleBeforeUnload = () => {
       if (controllerRef.current) {
+        invalidateStreamSession();
         controllerRef.current.abort();
+        transitionToStatus(STREAM_STATUS.ABORTED);
       }
       finalizeStreamingResponseRef.current();
+      publishDevMetrics(STREAM_STATUS.ABORTED);
     };
 
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => {
       window.removeEventListener("beforeunload", handleBeforeUnload);
     };
-  }, []);
+  }, [invalidateStreamSession, publishDevMetrics, transitionToStatus]);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -145,11 +332,34 @@ const ChatWindow = ({ messages = [], setMessages }) => {
     previousFirstMessageIdRef.current = firstMessageId;
 
     if (chatChanged && controllerRef.current && isLoadingRef.current) {
+      invalidateStreamSession();
       controllerRef.current.abort();
       finalizeStreamingResponseRef.current();
       setIsLoading(false);
+      isLoadingRef.current = false;
+      transitionToStatus(STREAM_STATUS.ABORTED);
+      publishDevMetrics(STREAM_STATUS.ABORTED);
     }
-  }, [firstMessageId]);
+  }, [firstMessageId, invalidateStreamSession, publishDevMetrics, transitionToStatus]);
+
+  // =========================
+  // 🔧 MARKDOWN PROCESSING
+  // =========================
+  // Process large finalized messages in worker to extract metadata
+  useEffect(() => {
+    const lastMessage = messages[messages.length - 1];
+
+    if (
+      !lastMessage ||
+      lastMessage.role !== "assistant" ||
+      lastMessage.isStreaming ||
+      lastMessage.content.length < 2000
+    ) {
+      return;
+    }
+
+    processMarkdown(lastMessage.content).catch(() => {});
+  }, [messages, processMarkdown]);
 
   const generateId = () => {
     return "msg_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8);
@@ -168,6 +378,7 @@ const ChatWindow = ({ messages = [], setMessages }) => {
     }
 
     controllerRef.current?.abort();
+    invalidateStreamSession();
     controllerRef.current = null;
     forceAutoScrollRef.current = true;
     shouldAutoScrollRef.current = true;
@@ -175,6 +386,11 @@ const ChatWindow = ({ messages = [], setMessages }) => {
 
     const requestId = activeRequestIdRef.current + 1;
     activeRequestIdRef.current = requestId;
+    const streamSessionId = beginStreamSession();
+    let terminalStatus = STREAM_STATUS.COMPLETED;
+    transitionToStatus(STREAM_STATUS.STARTING);
+    beginStreamMetrics(requestId, streamSessionId, "send");
+    devInvariantKeysRef.current.clear();
 
     let updatedMessages;
     const editIdx = editingIndex;
@@ -194,6 +410,7 @@ const ChatWindow = ({ messages = [], setMessages }) => {
     setMessages(updatedMessages);
     setInput("");
     setIsLoading(true);
+    isLoadingRef.current = true;
 
     try {
       controllerRef.current = new AbortController();
@@ -212,9 +429,14 @@ const ChatWindow = ({ messages = [], setMessages }) => {
       await streamAIResponse(
         updatedMessages,
         (incomingText) => {
-          if (!isMountedRef.current || requestId !== activeRequestIdRef.current) {
+          if (!isActiveStreamSession(requestId, streamSessionId)) {
+            devInvariant("stale-write-send", "Ignored stale token write in send flow", {
+              requestId,
+              sessionId: streamSessionId,
+            });
             return;
           }
+          markFirstToken(incomingText);
           setMessages((prev) => {
             const updated = [...prev];
             if (!updated.length) return updated;
@@ -226,9 +448,20 @@ const ChatWindow = ({ messages = [], setMessages }) => {
             return updated;
           });
         },
-        controllerRef.current
+        controllerRef.current,
+        getModel(selectedModelKey).id,
+        conversationId
       );
 
+      if (!isActiveStreamSession(requestId, streamSessionId)) {
+        devInvariant("stale-finalize-send", "Skipped finalize for stale send session", {
+          requestId,
+          sessionId: streamSessionId,
+        });
+        return;
+      }
+
+      markFinalizing();
       setMessages((prev) => {
         const updated = [...prev];
         if (!updated.length) return updated;
@@ -240,10 +473,29 @@ const ChatWindow = ({ messages = [], setMessages }) => {
       });
     } catch (err) {
       if (err.name === "AbortError") {
-        finalizeStreamingResponse();
+        terminalStatus = STREAM_STATUS.ABORTED;
+        if (isActiveStreamSession(requestId, streamSessionId)) {
+          finalizeStreamingResponse();
+          transitionToStatus(STREAM_STATUS.ABORTED);
+        } else {
+          devInvariant("abort-after-ownership-send", "Abort occurred after ownership changed", {
+            requestId,
+            sessionId: streamSessionId,
+          });
+        }
         return;
       }
 
+      if (!isActiveStreamSession(requestId, streamSessionId)) {
+        devInvariant("stale-error-send", "Ignored stale error write in send flow", {
+          requestId,
+          sessionId: streamSessionId,
+        });
+        return;
+      }
+
+      transitionToStatus(STREAM_STATUS.ERROR);
+      terminalStatus = STREAM_STATUS.ERROR;
       setMessages((prev) => {
         const updated = [...prev];
         const last = updated[updated.length - 1];
@@ -269,19 +521,24 @@ const ChatWindow = ({ messages = [], setMessages }) => {
         ];
       });
     } finally {
-      if (isMountedRef.current && requestId === activeRequestIdRef.current) {
+      if (isActiveStreamSession(requestId, streamSessionId)) {
         setIsLoading(false);
-      }
-      if (controllerRef.current?.signal?.aborted || requestId === activeRequestIdRef.current) {
+        isLoadingRef.current = false;
         controllerRef.current = null;
+        invalidateStreamSession();
+        transitionToStatus(terminalStatus);
+        publishDevMetrics(terminalStatus);
       }
     }
   };
 
   const stopGeneration = () => {
     activeRequestIdRef.current += 1;
+    invalidateStreamSession();
     controllerRef.current?.abort();
     controllerRef.current = null;
+    transitionToStatus(STREAM_STATUS.ABORTED);
+    publishDevMetrics(STREAM_STATUS.ABORTED);
 
     setMessages((prev) => {
       const updated = [...prev];
@@ -295,6 +552,7 @@ const ChatWindow = ({ messages = [], setMessages }) => {
     });
 
     setIsLoading(false);
+    isLoadingRef.current = false;
   };
 
   const handleEdit = (index, text) => {
@@ -305,7 +563,9 @@ const ChatWindow = ({ messages = [], setMessages }) => {
   const regenerateResponse = async () => {
     if (isLoading) return;
 
+    invalidateStreamSession();
     controllerRef.current?.abort();
+    controllerRef.current = null;
     forceAutoScrollRef.current = true;
     shouldAutoScrollRef.current = true;
     setShowJumpToLatest(false);
@@ -314,10 +574,19 @@ const ChatWindow = ({ messages = [], setMessages }) => {
     const lastUserIndex = [...baseMessages].reverse().findIndex((m) => m.role === "user");
     if (lastUserIndex === -1) return;
 
+    const requestId = activeRequestIdRef.current + 1;
+    activeRequestIdRef.current = requestId;
+    const streamSessionId = beginStreamSession();
+    let terminalStatus = STREAM_STATUS.COMPLETED;
+    transitionToStatus(STREAM_STATUS.STARTING);
+    beginStreamMetrics(requestId, streamSessionId, "regenerate");
+    devInvariantKeysRef.current.clear();
+
     const realIndex = baseMessages.length - 1 - lastUserIndex;
     const lastUser = baseMessages[realIndex];
 
     setIsLoading(true);
+    isLoadingRef.current = true;
 
     try {
       controllerRef.current = new AbortController();
@@ -344,6 +613,14 @@ const ChatWindow = ({ messages = [], setMessages }) => {
       await streamAIResponse(
         baseMessages,
         (incomingText) => {
+          if (!isActiveStreamSession(requestId, streamSessionId)) {
+            devInvariant("stale-write-regen", "Ignored stale token write in regenerate flow", {
+              requestId,
+              sessionId: streamSessionId,
+            });
+            return;
+          }
+          markFirstToken(incomingText);
           setMessages((prev) => {
             const updated = [...prev];
             updated[updated.length - 1] = {
@@ -354,9 +631,20 @@ const ChatWindow = ({ messages = [], setMessages }) => {
             return updated;
           });
         },
-        controllerRef.current
+        controllerRef.current,
+        getModel(selectedModelKey).id,
+        conversationId
       );
 
+      if (!isActiveStreamSession(requestId, streamSessionId)) {
+        devInvariant("stale-finalize-regen", "Skipped finalize for stale regenerate session", {
+          requestId,
+          sessionId: streamSessionId,
+        });
+        return;
+      }
+
+      markFinalizing();
       setMessages((prev) => {
         const updated = [...prev];
         if (!updated.length) return updated;
@@ -373,56 +661,87 @@ const ChatWindow = ({ messages = [], setMessages }) => {
       });
     } catch (err) {
       if (err.name === "AbortError") {
-        finalizeStreamingResponse();
+        terminalStatus = STREAM_STATUS.ABORTED;
+        if (isActiveStreamSession(requestId, streamSessionId)) {
+          finalizeStreamingResponse();
+          transitionToStatus(STREAM_STATUS.ABORTED);
+        } else {
+          devInvariant("abort-after-ownership-regen", "Abort occurred after regen ownership changed", {
+            requestId,
+            sessionId: streamSessionId,
+          });
+        }
       } else {
+        if (!isActiveStreamSession(requestId, streamSessionId)) {
+          devInvariant("stale-error-regen", "Ignored stale error write in regenerate flow", {
+            requestId,
+            sessionId: streamSessionId,
+          });
+          return;
+        }
+        transitionToStatus(STREAM_STATUS.ERROR);
+        terminalStatus = STREAM_STATUS.ERROR;
         console.error("Regeneration failed:", err);
       }
     } finally {
-      controllerRef.current = null;
-      if (isMountedRef.current) {
+      if (isActiveStreamSession(requestId, streamSessionId)) {
+        controllerRef.current = null;
         setIsLoading(false);
+        isLoadingRef.current = false;
+        invalidateStreamSession();
+        transitionToStatus(terminalStatus);
+        publishDevMetrics(terminalStatus);
       }
     }
   };
 
-  const getAssistantParentKey = (msg, index, sourceMessages = messages) => {
-    if (msg.role !== "assistant") return null;
-    if (msg.parentId) return msg.parentId;
+  const getAssistantParentKey = useCallback(
+    (msg, index, sourceMessages = messages) => {
+      if (msg.role !== "assistant") return null;
+      if (msg.parentId) return msg.parentId;
 
-    for (let i = index - 1; i >= 0; i--) {
-      if (sourceMessages[i]?.role === "user") {
-        return sourceMessages[i].id ?? `__user_slot_${i}`;
-      }
-    }
-
-    return null;
-  };
-
-  const getVersions = (messageList) => {
-    const map = {};
-
-    messageList.forEach((msg, index) => {
-      const parentKey = getAssistantParentKey(msg, index, messageList);
-      if (parentKey) {
-        if (!map[parentKey]) {
-          map[parentKey] = [];
+      for (let i = index - 1; i >= 0; i--) {
+        if (sourceMessages[i]?.role === "user") {
+          return sourceMessages[i].id ?? `__user_slot_${i}`;
         }
-        map[parentKey].push(msg);
       }
-    });
 
-    return map;
-  };
-
-  const versionMap = getVersions(messages);
-  const latestAssistantIndex = messages.reduce(
-    (latest, msg, index) => (msg.role === "assistant" ? index : latest),
-    -1
+      return null;
+    },
+    [messages]
   );
-  const latestAssistantParentKey =
-    latestAssistantIndex >= 0
-      ? getAssistantParentKey(messages[latestAssistantIndex], latestAssistantIndex)
-      : null;
+
+  const getVersions = useCallback(
+    (messageList) => {
+      const map = {};
+
+      messageList.forEach((msg, index) => {
+        const parentKey = getAssistantParentKey(msg, index, messageList);
+        if (parentKey) {
+          if (!map[parentKey]) {
+            map[parentKey] = [];
+          }
+          map[parentKey].push(msg);
+        }
+      });
+
+      return map;
+    },
+    [getAssistantParentKey]
+  );
+
+  const versionMap = useMemo(() => getVersions(messages), [getVersions, messages]);
+  const latestAssistantIndex = useMemo(
+    () => messages.reduce((latest, msg, index) => (msg.role === "assistant" ? index : latest), -1),
+    [messages]
+  );
+  const latestAssistantParentKey = useMemo(
+    () =>
+      latestAssistantIndex >= 0
+        ? getAssistantParentKey(messages[latestAssistantIndex], latestAssistantIndex)
+        : null,
+    [getAssistantParentKey, latestAssistantIndex, messages]
+  );
 
   const canRegenerate = (msg, index) => {
     const parentKey = getAssistantParentKey(msg, index);
@@ -433,6 +752,13 @@ const ChatWindow = ({ messages = [], setMessages }) => {
     <div className="flex min-h-screen min-w-0 flex-col bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-slate-100">
       <header className="sticky top-0 z-50 flex items-center justify-between gap-3 border-b border-slate-700/40 bg-slate-900/80 px-3 py-3 backdrop-blur-xl sm:px-5">
         <div className="flex min-w-0 items-center gap-3">
+          <button
+            onClick={() => onOpenSidebar?.()}
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-slate-700/60 text-slate-300 transition-colors hover:border-slate-500 hover:text-slate-100 md:hidden"
+            aria-label="Open chats sidebar"
+          >
+            ≡
+          </button>
           <AppLogo />
           <div className="min-w-0 leading-tight">
             <div className="truncate text-sm font-semibold tracking-[-0.01em] text-gray-100">
@@ -441,8 +767,29 @@ const ChatWindow = ({ messages = [], setMessages }) => {
             <div className="truncate text-xs text-gray-500">AI Assistant</div>
           </div>
         </div>
-        <div className="flex shrink-0 items-center gap-2" />
+        <div className="flex shrink-0 items-center gap-2">
+          <ModelSelector
+            selectedModelKey={selectedModelKey}
+            onModelChange={handleModelChange}
+          />
+        </div>
       </header>
+
+      {IS_DEV && (
+        <div className="pointer-events-none fixed bottom-2 left-2 z-[60] rounded-lg border border-slate-600/60 bg-slate-900/85 px-2.5 py-2 text-[11px] text-slate-200 shadow-lg shadow-black/40 backdrop-blur-md">
+          <div className="font-semibold uppercase tracking-[0.12em] text-slate-300">Stream</div>
+          <div className="mt-1">Status: {streamStatus}</div>
+          {devStreamMetrics && (
+            <>
+              <div>Mode: {devStreamMetrics.mode}</div>
+              <div>TTFT: {devStreamMetrics.ttftMs?.toFixed(0) ?? "-"} ms</div>
+              <div>Duration: {devStreamMetrics.durationMs?.toFixed(0) ?? "-"} ms</div>
+              <div>Finalize: {devStreamMetrics.finalizeMs?.toFixed(0) ?? "-"} ms</div>
+              <div>Chars/s: {devStreamMetrics.throughputPerSec}</div>
+            </>
+          )}
+        </div>
+      )}
 
       {messages.length === 0 ? (
         <div className="flex flex-1 items-center justify-center">
@@ -575,7 +922,7 @@ const ChatWindow = ({ messages = [], setMessages }) => {
         </div>
       )}
 
-      <div className="mx-auto w-full max-w-4xl px-2.5 pb-3 sm:px-5 sm:pb-5 md:px-8 md:pb-6 lg:px-10">
+      <div className="mx-auto w-full max-w-4xl px-2.5 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:px-5 sm:pb-[calc(1.25rem+env(safe-area-inset-bottom))] md:px-8 md:pb-[calc(1.5rem+env(safe-area-inset-bottom))] lg:px-10">
         <InputBox
           value={editingIndex !== null ? editingText : input}
           setValue={(val) => {

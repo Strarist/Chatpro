@@ -1,19 +1,36 @@
 import os
 import json
 from pathlib import Path
+from uuid import uuid4
 
 import requests
 from dotenv import load_dotenv
-from fastapi import FastAPI
+from contextlib import asynccontextmanager
+from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
-from pydantic import BaseModel, Field
+from sqlalchemy.orm import Session
+
+# Local imports
+from db import init_db, get_db, ConversationModel, MessageModel
+from schemas import (
+    ChatRequest, MessageAppendRequest, ConversationCreateRequest,
+    ConversationUpdateRequest, ConversationResponse, ConversationListResponse,
+    MessageResponse
+)
 
 
 # Load .env from the same directory as this file
 load_dotenv(dotenv_path=Path(__file__).with_name(".env"))
 
-app = FastAPI()
+
+@asynccontextmanager
+async def lifespan(application):
+    init_db()
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
 
 
 # =========================
@@ -63,18 +80,6 @@ app.add_middleware(
 
 
 # =========================
-# 📦 MODELS
-# =========================
-class Message(BaseModel):
-    role: str
-    content: str
-
-
-class ChatRequest(BaseModel):
-    messages: list[Message] = Field(default_factory=list)
-
-
-# =========================
 # ❌ ERROR HELPERS
 # =========================
 def error_response(code: str, message: str, status_code: int = 400):
@@ -112,11 +117,135 @@ def root():
 
 
 # =========================
-# 🚀 CHAT ENDPOINT
+# 💬 CONVERSATION ENDPOINTS
+# =========================
+
+@app.post("/conversations", response_model=ConversationResponse)
+def create_conversation(
+    req: ConversationCreateRequest,
+    db: Session = Depends(get_db)
+):
+    """Create a new conversation."""
+    conversation_id = str(uuid4())
+    conversation = ConversationModel(
+        id=conversation_id,
+        title=req.title
+    )
+    db.add(conversation)
+    db.commit()
+    db.refresh(conversation)
+    return conversation
+
+
+@app.get("/conversations", response_model=list[ConversationListResponse])
+def list_conversations(db: Session = Depends(get_db)):
+    """List all conversations (sorted by most recent first)."""
+    conversations = db.query(ConversationModel).order_by(
+        ConversationModel.updated_at.desc()
+    ).all()
+    return conversations
+
+
+@app.get("/conversations/{conversation_id}", response_model=ConversationResponse)
+def get_conversation(
+    conversation_id: str,
+    db: Session = Depends(get_db)
+):
+    """Get a single conversation with all its messages."""
+    conversation = db.query(ConversationModel).filter(
+        ConversationModel.id == conversation_id
+    ).first()
+    
+    if not conversation:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    
+    return conversation
+
+
+@app.post("/conversations/{conversation_id}/messages", response_model=MessageResponse)
+def append_message(
+    conversation_id: str,
+    req: MessageAppendRequest,
+    db: Session = Depends(get_db)
+):
+    """Append a message to a conversation."""
+    conversation = db.query(ConversationModel).filter(
+        ConversationModel.id == conversation_id
+    ).first()
+    
+    if not conversation:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    
+    message = MessageModel(
+        id=str(uuid4()),
+        conversation_id=conversation_id,
+        role=req.role,
+        content=req.content
+    )
+    db.add(message)
+    db.commit()
+    db.refresh(message)
+    
+    return message
+
+
+@app.put("/conversations/{conversation_id}", response_model=ConversationResponse)
+def update_conversation(
+    conversation_id: str,
+    req: ConversationUpdateRequest,
+    db: Session = Depends(get_db)
+):
+    """Update conversation metadata (title)."""
+    conversation = db.query(ConversationModel).filter(
+        ConversationModel.id == conversation_id
+    ).first()
+    
+    if not conversation:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    
+    if req.title is not None:
+        conversation.title = req.title
+    
+    db.commit()
+    db.refresh(conversation)
+    
+    return conversation
+
+
+@app.delete("/conversations/{conversation_id}")
+def delete_conversation(
+    conversation_id: str,
+    db: Session = Depends(get_db)
+):
+    """Delete a conversation and all its messages."""
+    conversation = db.query(ConversationModel).filter(
+        ConversationModel.id == conversation_id
+    ).first()
+    
+    if not conversation:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    
+    db.delete(conversation)
+    db.commit()
+    
+    return {"status": "deleted", "conversation_id": conversation_id}
+
+
+
+# =========================
+# 🚀 CHAT ENDPOINT (STREAMING)
 # =========================
 @app.post("/chat")
-def chat_endpoint(req: ChatRequest):
+def chat_endpoint(req: ChatRequest, db: Session = Depends(get_db)):
+    """
+    Stream AI response using SSE.
+    
+    Optionally persists the request to a conversation if conversation_id is provided.
+    Preserves full streaming safety and lifecycle.
+    """
     raw_messages = req.messages
+    selected_model = req.model or OPENROUTER_MODEL
+    conversation_id = req.conversation_id
 
     # System prompt
     system_prompt = {
@@ -181,7 +310,7 @@ def chat_endpoint(req: ChatRequest):
                     "X-Title": APP_TITLE,
                 },
                 json={
-                    "model": OPENROUTER_MODEL,
+                    "model": selected_model,
                     "messages": messages,
                     "stream": True,
                     "max_tokens": MAX_TOKENS,
@@ -192,11 +321,10 @@ def chat_endpoint(req: ChatRequest):
             )
 
             if response.status_code != 200:
-                # Include the upstream response body in the SSE error payload
                 body_text = response.text or ""
                 body_text = body_text.strip()
                 print(
-                    f"OPENROUTER ERROR: status={response.status_code} model={OPENROUTER_MODEL} body={body_text}"
+                    f"OPENROUTER ERROR: status={response.status_code} model={selected_model} body={body_text}"
                 )
                 yield sse_error(
                     f"OpenRouter error: {body_text}",

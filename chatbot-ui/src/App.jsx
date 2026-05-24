@@ -2,6 +2,20 @@ import { useState, useEffect, useMemo } from "react";
 import ChatWindow from "./components/ChatWindow";
 import Sidebar from "./components/Sidebar";
 import LandingPage from "./pages/LandingPage";
+import {
+  createConversation,
+  fetchConversations,
+  updateConversationTitle,
+  deleteConversation,
+  migrateLocalChatsToBackend,
+} from "./services/conversationService";
+
+const STORAGE_KEYS = {
+  chats: "chatpro.chats",
+  activeChatId: "chatpro.activeChatId",
+  hasStartedChat: "chatpro.hasStartedChat",
+  backendSynced: "chatpro.backendSynced",
+};
 
 const isLocalhost =
   typeof window !== "undefined" &&
@@ -19,51 +33,137 @@ if (typeof window !== "undefined") {
 // 🧠 DEFAULT CHAT FACTORY
 // =========================
 const createDefaultChat = () => ({
-  id: Date.now(),
+  id: crypto.randomUUID ? crypto.randomUUID() : "chat_" + Date.now(),
   title: "New Chat",
   messages: [{ role: "assistant", content: "Hi! Ask me anything." }],
 });
 
+const safeJsonParse = (value, fallback) => {
+  if (typeof value !== "string") return fallback;
+  try {
+    const parsed = JSON.parse(value);
+    return parsed !== null && parsed !== undefined ? parsed : fallback;
+  } catch {
+    return fallback;
+  }
+};
+
+const loadChats = () => {
+  if (typeof window === "undefined" || !window.localStorage) {
+    return [createDefaultChat()];
+  }
+
+  const saved = window.localStorage.getItem(STORAGE_KEYS.chats);
+  const parsed = safeJsonParse(saved, null);
+  if (Array.isArray(parsed) && parsed.length > 0) {
+    return parsed;
+  }
+
+  return [createDefaultChat()];
+};
+
+const loadHasStartedChat = () => {
+  if (typeof window === "undefined" || !window.localStorage) return false;
+
+  const saved = window.localStorage.getItem(STORAGE_KEYS.hasStartedChat);
+  if (saved === "true") return true;
+
+  const persistedChats = window.localStorage.getItem(STORAGE_KEYS.chats);
+  if (typeof persistedChats === "string" && persistedChats.trim().length > 0) {
+    const parsed = safeJsonParse(persistedChats, null);
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      return true;
+    }
+  }
+
+  return false;
+};
+
+const loadActiveChatId = (fallbackChats) => {
+  if (typeof window === "undefined" || !window.localStorage) return fallbackChats[0]?.id ?? null;
+  const saved = window.localStorage.getItem(STORAGE_KEYS.activeChatId);
+  if (saved) {
+    return saved;
+  }
+  return fallbackChats[0]?.id ?? null;
+};
+
+// Convert backend conversation to frontend chat format
+const conversationToChatFormat = (conversation) => ({
+  id: conversation.id,
+  title: conversation.title,
+  messages: conversation.messages || [],
+});
+
 function App() {
   // =========================
-  // 🧠 SHOW CHAT STATE
+  // 🧠 STATE
   // =========================
-  const [showChat, setShowChat] = useState(false);
+  const [showChat, setShowChat] = useState(() => loadHasStartedChat());
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isLoadingChats, setIsLoadingChats] = useState(true);
+  const [useBackend, setUseBackend] = useState(true);
+
+  // Initial load from localStorage as fallback
+  const initialChats = loadChats();
+  const [chats, setChats] = useState(initialChats);
+  const [activeChatId, setActiveChatId] = useState(() => loadActiveChatId(initialChats));
 
   // =========================
-  // 🧠 LOAD CHATS
+  // 🔄 LOAD BACKEND CONVERSATIONS (on mount)
   // =========================
-  const [chats, setChats] = useState(() => {
-    try {
-      const saved = localStorage.getItem("chats");
-
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
+  useEffect(() => {
+    const syncFromBackend = async () => {
+      try {
+        const conversations = await fetchConversations();
+        
+        if (!conversations || conversations.length === 0) {
+          // Backend empty: migrate local chats if available
+          const backendSynced = window.localStorage?.getItem(STORAGE_KEYS.backendSynced) === "true";
+          
+          if (!backendSynced && initialChats.length > 0 && initialChats[0].title !== "New Chat") {
+            // Don't migrate default empty chat
+            const hasRealChats = initialChats.some(c => c.messages?.length > 1 || c.title !== "New Chat");
+            if (hasRealChats) {
+              const migrated = await migrateLocalChatsToBackend(initialChats);
+              setChats(migrated);
+              setActiveChatId(migrated[0]?.id || initialChats[0]?.id);
+              window.localStorage?.setItem(STORAGE_KEYS.backendSynced, "true");
+              return;
+            }
+          }
+          
+          setUseBackend(false);
+          setIsLoadingChats(false);
+          return;
         }
+
+        // Convert backend format to frontend format
+        const formattedChats = conversations.map(conversationToChatFormat);
+        setChats(formattedChats);
+        
+        // Restore active chat or use first
+        const savedActiveChatId = window.localStorage?.getItem(STORAGE_KEYS.activeChatId);
+        if (savedActiveChatId && formattedChats.some(c => c.id === savedActiveChatId)) {
+          setActiveChatId(savedActiveChatId);
+        } else {
+          setActiveChatId(formattedChats[0]?.id);
+        }
+        
+        setUseBackend(true);
+        window.localStorage?.setItem(STORAGE_KEYS.backendSynced, "true");
+      } catch (error) {
+        console.error("Failed to load from backend, falling back to localStorage:", error);
+        setUseBackend(false);
+        setChats(initialChats);
+      } finally {
+        setIsLoadingChats(false);
       }
-    } catch (err) {
-      console.error("Failed to parse chats:", err);
-    }
+    };
 
-    // Initialize with one default chat
-    return [createDefaultChat()];
-  });
-
-  // =========================
-  // 🧠 ACTIVE CHAT ID
-  // =========================
-  const [activeChatId, setActiveChatId] = useState(() => {
-    const saved = localStorage.getItem("activeChatId");
-
-    if (saved) {
-      return Number(saved);
-    }
-
-    // Match the initial default chat
-    return chats[0]?.id ?? null;
-  });
+    syncFromBackend();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // =========================
   // 🧠 DERIVE ACTIVE CHAT
@@ -76,20 +176,30 @@ function App() {
   }, [chats, activeChatId]);
 
   // =========================
-  // 💾 SAVE CHATS
+  // 💾 SAVE CHATS (localStorage + backend)
   // =========================
   useEffect(() => {
-    localStorage.setItem("chats", JSON.stringify(chats));
+    if (typeof window === "undefined" || !window.localStorage) return;
+    window.localStorage.setItem(STORAGE_KEYS.chats, JSON.stringify(chats));
   }, [chats]);
 
   // =========================
   // 💾 SAVE ACTIVE CHAT ID
   // =========================
   useEffect(() => {
+    if (typeof window === "undefined" || !window.localStorage) return;
     if (activeChat?.id !== undefined) {
-      localStorage.setItem("activeChatId", activeChat.id.toString());
+      window.localStorage.setItem(STORAGE_KEYS.activeChatId, String(activeChat.id));
     }
   }, [activeChat]);
+
+  // =========================
+  // 💾 SAVE LANDING VISIT STATE
+  // =========================
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.localStorage) return;
+    window.localStorage.setItem(STORAGE_KEYS.hasStartedChat, showChat ? "true" : "false");
+  }, [showChat]);
 
   // =========================
   // 📝 UPDATE MESSAGES
@@ -116,6 +226,11 @@ function App() {
           }
         }
 
+        // Sync updated title to backend
+        if (useBackend && updatedTitle !== chat.title) {
+          updateConversationTitle(chat.id, updatedTitle).catch(console.error);
+        }
+
         return {
           ...chat,
           messages: resolved,
@@ -128,17 +243,42 @@ function App() {
   // =========================
   // ➕ CREATE NEW CHAT
   // =========================
-  const createNewChat = () => {
-    const newChat = createDefaultChat();
-
-    setChats((prev) => [newChat, ...prev]);
-    setActiveChatId(newChat.id);
+  const createNewChat = async () => {
+    if (useBackend) {
+      try {
+        const conversation = await createConversation("New Chat");
+        const newChat = conversationToChatFormat(conversation);
+        setChats((prev) => [newChat, ...prev]);
+        setActiveChatId(newChat.id);
+      } catch (error) {
+        console.error("Error creating conversation on backend:", error);
+        // Fallback to local
+        const newChat = createDefaultChat();
+        setChats((prev) => [newChat, ...prev]);
+        setActiveChatId(newChat.id);
+      }
+    } else {
+      const newChat = createDefaultChat();
+      setChats((prev) => [newChat, ...prev]);
+      setActiveChatId(newChat.id);
+    }
+    
+    setShowChat(true);
+    setIsSidebarOpen(false);
   };
 
   // =========================
   // ❌ DELETE CHAT
   // =========================
-  const deleteChat = (id) => {
+  const deleteChat = async (id) => {
+    if (useBackend) {
+      try {
+        await deleteConversation(id);
+      } catch (error) {
+        console.error("Error deleting conversation on backend:", error);
+      }
+    }
+
     setChats((prev) => {
       const updated = prev.filter((chat) => chat.id !== id);
 
@@ -156,26 +296,56 @@ function App() {
     });
   };
 
+  const handleStartChat = () => {
+    if (!activeChat?.id) {
+      const baseChat = chats[0] ?? createDefaultChat();
+      setActiveChatId(baseChat.id);
+    }
+    setShowChat(true);
+  };
+
+  if (isLoadingChats) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-[#0f172a] text-white">
+        <div className="text-center">
+          <h2 className="mb-2 text-lg">Loading conversations...</h2>
+        </div>
+      </div>
+    );
+  }
+
   if (!showChat) {
-    return <LandingPage onStartChat={() => setShowChat(true)} />;
+    return <LandingPage onStartChat={handleStartChat} />;
   }
 
   return (
     <div className="flex h-screen min-w-0 overflow-hidden bg-[#0f172a] text-white sm:h-[100dvh]">
+      {isSidebarOpen && (
+        <button
+          onClick={() => setIsSidebarOpen(false)}
+          className="fixed inset-0 z-30 bg-black/50 md:hidden"
+          aria-label="Close sidebar"
+        />
+      )}
+
       <Sidebar
         chats={chats}
         activeChatId={activeChat?.id}
         setActiveChatId={setActiveChatId}
         createNewChat={createNewChat}
         deleteChat={deleteChat}
+        isOpen={isSidebarOpen}
+        onCloseMobile={() => setIsSidebarOpen(false)}
       />
 
       <div className="flex min-w-0 flex-1 flex-col">
         {activeChat ? (
           <ChatWindow
             key={activeChat.id}
+            conversationId={useBackend ? activeChat.id : null}
             messages={activeChat.messages}
             setMessages={updateMessages}
+            onOpenSidebar={() => setIsSidebarOpen(true)}
           />
         ) : (
           <div className="flex flex-1 items-center justify-center text-gray-400">

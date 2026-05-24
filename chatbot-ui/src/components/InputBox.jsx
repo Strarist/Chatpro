@@ -79,11 +79,12 @@ const InputBox = ({ value, setValue, onSend, onStop, isLoading }) => {
         onFocus={() => setIsFocused(true)}
         onBlur={() => setIsFocused(false)}
         placeholder="Message ChatPro..."
+        enterKeyHint="send"
         rows={1}
         className="
           min-w-0 flex-1 resize-none bg-transparent outline-none
           text-gray-100 placeholder:text-gray-500
-          text-sm leading-relaxed font-medium
+          text-base leading-relaxed font-medium sm:text-sm
           max-h-[120px] overflow-hidden
         "
       />

@@ -16,14 +16,26 @@ const API_URL = (() => {
  * @param {Array} messages - Chat messages.
  * @param {Function} onChunk - Called with the progressively built response text.
  * @param {AbortController} controller - Optional abort controller.
+ * @param {string} model - Optional model ID (uses default if not provided).
+ * @param {string} conversationId - Optional conversation ID for persistence.
  */
-export const streamAIResponse = async (messages, onChunk, controller) => {
+export const streamAIResponse = async (messages, onChunk, controller, model, conversationId) => {
+  const body = { messages };
+  
+  // Add optional parameters
+  if (model) {
+    body.model = model;
+  }
+  if (conversationId) {
+    body.conversation_id = conversationId;
+  }
+
   const res = await fetch(`${API_URL}/chat`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ messages }),
+    body: JSON.stringify(body),
     signal: controller?.signal,
   });
 
@@ -52,13 +64,41 @@ export const streamAIResponse = async (messages, onChunk, controller) => {
   let hasPrimaryText = false;
   let buffer = "";
 
+  const coerceText = (value) => {
+    if (typeof value === "string") {
+      return value;
+    }
+
+    if (!Array.isArray(value)) {
+      return "";
+    }
+
+    return value
+      .map((part) => {
+        if (typeof part === "string") return part;
+        if (typeof part?.text === "string") return part.text;
+        if (typeof part?.content === "string") return part.content;
+        if (typeof part?.refusal === "string") return part.refusal;
+        return "";
+      })
+      .join("");
+  };
+
   const extractPrimaryText = (choice) => {
     const delta = choice?.delta ?? {};
-    const candidates = [delta.content, choice?.message?.content, delta.text, choice?.text];
+    const candidates = [
+      delta.content,
+      choice?.message?.content,
+      delta.text,
+      choice?.text,
+      delta.output_text,
+      choice?.output_text,
+    ];
 
     for (const value of candidates) {
-      if (typeof value === "string" && value.length > 0) {
-        return value;
+      const normalized = coerceText(value);
+      if (normalized.length > 0) {
+        return normalized;
       }
     }
 
@@ -77,16 +117,22 @@ export const streamAIResponse = async (messages, onChunk, controller) => {
       return "";
     }
 
-    return details.map((item) => (typeof item?.summary === "string" ? item.summary : "")).join("");
+    return details
+      .map((item) => {
+        const summary = coerceText(item?.summary);
+        if (summary) return summary;
+        return coerceText(item?.text);
+      })
+      .join("");
   };
 
   const processLine = (rawLine) => {
     const line = rawLine.trim();
-    if (!line || !line.startsWith("data: ")) {
+    if (!line || !line.startsWith("data:")) {
       return;
     }
 
-    const payload = line.slice(6).trim();
+    const payload = line.slice(5).trim();
     if (payload === "[DONE]") {
       return;
     }

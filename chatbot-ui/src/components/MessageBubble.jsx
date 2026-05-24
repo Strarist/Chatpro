@@ -1,8 +1,10 @@
-import { useMemo, useState } from "react";
+import { memo, useMemo, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
+
+const MAX_HIGHLIGHT_CHARS = 12000;
 
 const markdownComponents = {
   p: ({ children }) => (
@@ -51,6 +53,16 @@ const markdownComponents = {
     const isBlock = Boolean(match) || codeText.includes("\n");
 
     if (isBlock) {
+      if (codeText.length > MAX_HIGHLIGHT_CHARS) {
+        return (
+          <div className="my-4 overflow-hidden rounded-xl border border-slate-700/70 bg-slate-950/90 shadow-[0_0_0_1px_rgba(148,163,184,0.08),0_10px_30px_rgba(2,6,23,0.45)]">
+            <pre className="max-h-[36rem] overflow-auto px-4 py-3 text-[0.86rem] leading-[1.55rem] text-slate-100">
+              <code>{codeText}</code>
+            </pre>
+          </div>
+        );
+      }
+
       return (
         <div className="my-4 overflow-hidden rounded-xl border border-slate-700/70 bg-slate-950/90 shadow-[0_0_0_1px_rgba(148,163,184,0.08),0_10px_30px_rgba(2,6,23,0.45)]">
           <div className="overflow-x-auto px-4 py-3">
@@ -197,9 +209,9 @@ const MessageBubble = ({
           </div>
 
           <div className="flex w-full max-w-[90%] flex-col gap-2 sm:max-w-[82%] md:max-w-[74%] lg:max-w-[72%]">
-            <div className="w-full overflow-hidden rounded-2xl border border-slate-700/50 bg-slate-800/40 px-4 py-3 text-[15px] text-slate-100 shadow-lg shadow-black/30 break-words transition-all duration-200 ease-out hover:border-slate-600/60 hover:bg-slate-800/50 hover:shadow-xl hover:shadow-black/40 backdrop-blur-md sm:px-5">
+            <div className="w-full min-h-[2.75rem] overflow-hidden rounded-2xl border border-slate-700/50 bg-slate-800/40 px-4 py-3 text-[15px] text-slate-100 shadow-lg shadow-black/30 break-words transition-all duration-200 ease-out hover:border-slate-600/60 hover:bg-slate-800/50 hover:shadow-xl hover:shadow-black/40 backdrop-blur-md sm:px-5">
               {isStreaming ? (
-                <div className="whitespace-pre-wrap break-words leading-7 text-slate-100">
+                <div className="whitespace-pre-wrap break-words leading-7 text-slate-100 [text-wrap:pretty]">
                   {messageContent}
                 </div>
               ) : (
@@ -283,4 +295,16 @@ const MessageBubble = ({
   );
 };
 
-export default MessageBubble;
+const areBubblePropsEqual = (prevProps, nextProps) => {
+  const prevMessage = prevProps.message;
+  const nextMessage = nextProps.message;
+
+  if (prevMessage !== nextMessage) return false;
+  if (prevProps.versionIndex !== nextProps.versionIndex) return false;
+  if (prevProps.totalVersions !== nextProps.totalVersions) return false;
+  if (Boolean(prevProps.onRegenerate) !== Boolean(nextProps.onRegenerate)) return false;
+  if (Boolean(prevProps.onEdit) !== Boolean(nextProps.onEdit)) return false;
+  return true;
+};
+
+export default memo(MessageBubble, areBubblePropsEqual);

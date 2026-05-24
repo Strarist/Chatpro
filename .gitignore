@@ -6,3 +6,6 @@
 # Python cache artifacts
 __pycache__/
 *.pyc
+
+# Database
+*.db

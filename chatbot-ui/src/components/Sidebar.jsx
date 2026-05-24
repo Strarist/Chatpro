@@ -1,12 +1,27 @@
 import AppLogo from "./AppLogo";
 
-const Sidebar = ({ chats, activeChatId, setActiveChatId, createNewChat, deleteChat }) => {
+const Sidebar = ({
+  chats,
+  activeChatId,
+  setActiveChatId,
+  createNewChat,
+  deleteChat,
+  isOpen,
+  onCloseMobile,
+}) => {
   return (
-    <div className="flex h-full w-44 shrink-0 flex-col border-r border-slate-700/40 bg-gradient-to-b from-slate-900 via-slate-900/95 to-slate-900 sm:w-52 md:w-60 lg:w-64 backdrop-blur-xl">
+    <div
+      className={`fixed inset-y-0 left-0 z-40 flex h-full w-64 shrink-0 flex-col border-r border-slate-700/40 bg-gradient-to-b from-slate-900 via-slate-900/95 to-slate-900 backdrop-blur-xl transition-transform duration-300 ease-out md:static md:z-auto md:w-60 md:translate-x-0 lg:w-64 ${
+        isOpen ? "translate-x-0" : "-translate-x-full"
+      }`}
+    >
       {/* New Chat Button */}
       <div className="p-2.5 sm:p-3 md:p-4">
         <button
-          onClick={createNewChat}
+          onClick={() => {
+            createNewChat();
+            onCloseMobile?.();
+          }}
           className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-blue-500 px-3 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-950/40 transition-all duration-300 ease-out hover:from-blue-500 hover:to-blue-400 hover:shadow-xl hover:shadow-blue-950/50 active:scale-[0.97] active:from-blue-700 active:to-blue-600 sm:px-4"
         >
           <span className="text-base leading-none">+</span>
@@ -22,7 +37,10 @@ const Sidebar = ({ chats, activeChatId, setActiveChatId, createNewChat, deleteCh
         {chats.map((chat) => (
           <div
             key={chat.id}
-            onClick={() => setActiveChatId(chat.id)}
+            onClick={() => {
+              setActiveChatId(chat.id);
+              onCloseMobile?.();
+            }}
             className={`group flex cursor-pointer items-center justify-between gap-2 rounded-lg border px-2.5 py-2 text-sm transition-all duration-200 ease-out active:scale-[0.99] md:px-3 md:py-2.5 ${
               activeChatId === chat.id
                 ? "border-blue-500/40 bg-blue-500/10 backdrop-blur-md text-gray-100 shadow-lg shadow-blue-950/20"
