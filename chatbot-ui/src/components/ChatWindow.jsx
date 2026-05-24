@@ -18,8 +18,11 @@ const ChatWindow = ({ messages = [], setMessages }) => {
   const controllerRef = useRef(null);
   const activeRequestIdRef = useRef(0);
   const isMountedRef = useRef(true);
+  const isLoadingRef = useRef(false);
   const shouldAutoScrollRef = useRef(true);
   const forceAutoScrollRef = useRef(false);
+  const finalizeStreamingResponseRef = useRef(() => {});
+  const previousFirstMessageIdRef = useRef(null);
 
   const isNearBottom = useCallback((el, threshold = AUTO_SCROLL_THRESHOLD) => {
     if (!el) return true;
@@ -49,29 +52,37 @@ const ChatWindow = ({ messages = [], setMessages }) => {
   }, [setMessages]);
 
   useEffect(() => {
+    finalizeStreamingResponseRef.current = finalizeStreamingResponse;
+  }, [finalizeStreamingResponse]);
+
+  useEffect(() => {
+    isLoadingRef.current = isLoading;
+  }, [isLoading]);
+
+  useEffect(() => {
     isMountedRef.current = true;
     return () => {
       isMountedRef.current = false;
       if (controllerRef.current) {
         controllerRef.current.abort();
-        finalizeStreamingResponse();
+        finalizeStreamingResponseRef.current();
       }
     };
-  }, [finalizeStreamingResponse]);
+  }, []);
 
   useEffect(() => {
     const handleBeforeUnload = () => {
       if (controllerRef.current) {
         controllerRef.current.abort();
       }
-      finalizeStreamingResponse();
+      finalizeStreamingResponseRef.current();
     };
 
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => {
       window.removeEventListener("beforeunload", handleBeforeUnload);
     };
-  }, [finalizeStreamingResponse]);
+  }, []);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -125,12 +136,20 @@ const ChatWindow = ({ messages = [], setMessages }) => {
 
   const firstMessageId = hasMessages ? messages[0]?.id : null;
   useEffect(() => {
-    if (controllerRef.current && isLoading) {
+    if (previousFirstMessageIdRef.current === null) {
+      previousFirstMessageIdRef.current = firstMessageId;
+      return;
+    }
+
+    const chatChanged = previousFirstMessageIdRef.current !== firstMessageId;
+    previousFirstMessageIdRef.current = firstMessageId;
+
+    if (chatChanged && controllerRef.current && isLoadingRef.current) {
       controllerRef.current.abort();
-      finalizeStreamingResponse();
+      finalizeStreamingResponseRef.current();
       setIsLoading(false);
     }
-  }, [finalizeStreamingResponse, firstMessageId, isLoading]);
+  }, [firstMessageId]);
 
   const generateId = () => {
     return "msg_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8);
