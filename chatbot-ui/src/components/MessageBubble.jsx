@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
@@ -138,6 +138,15 @@ const MessageBubble = ({
     }
   };
 
+  const finalizedMarkdown = useMemo(() => {
+    if (isUser || message.isStreaming) return null;
+    return (
+      <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+        {message.content}
+      </ReactMarkdown>
+    );
+  }, [isUser, message.content, message.isStreaming]);
+
   return (
     <div
       className={`w-full flex ${
@@ -178,9 +187,13 @@ const MessageBubble = ({
 
           <div className="flex w-full max-w-[90%] flex-col gap-2 sm:max-w-[82%] md:max-w-[74%] lg:max-w-[72%]">
             <div className="w-full overflow-hidden rounded-2xl border border-slate-700/50 bg-slate-800/40 px-4 py-3 text-[15px] text-slate-100 shadow-lg shadow-black/30 break-words transition-all duration-200 ease-out hover:border-slate-600/60 hover:bg-slate-800/50 hover:shadow-xl hover:shadow-black/40 backdrop-blur-md sm:px-5">
-              <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-                {message.content}
-              </ReactMarkdown>
+              {message.isStreaming ? (
+                <div className="whitespace-pre-wrap break-words leading-7 text-slate-100">
+                  {message.content}
+                </div>
+              ) : (
+                <div className="animate-in fade-in duration-150">{finalizedMarkdown}</div>
+              )}
 
               {message.isStreaming && (
                 <span className="ml-0.5 inline-block h-[1em] w-[2px] rounded-full bg-blue-300/80 align-[-0.125em] animate-pulse" />
