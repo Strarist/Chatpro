@@ -173,6 +173,40 @@ export default function LandingPage({ onStartChat }) {
     },
   ];
 
+  const previewCardVariants = {
+    hidden: { opacity: 0, y: 40 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: {
+        duration: 0.8,
+        ease: "easeOut",
+        delay: 0.8,
+      },
+    },
+  };
+
+  const previewFloatVariants = {
+    animate: {
+      y: [0, -15, 0],
+      transition: {
+        duration: 4,
+        repeat: Infinity,
+        ease: "easeInOut",
+      },
+    },
+  };
+
+  const typingDotVariants = {
+    animate: {
+      opacity: [0.4, 1, 0.4],
+      transition: {
+        duration: 1.4,
+        repeat: Infinity,
+      },
+    },
+  };
+
   return (
     <div className="relative w-full overflow-hidden bg-[#0f172a] text-white">
       {/* Static gradient background */}
@@ -263,6 +297,107 @@ export default function LandingPage({ onStartChat }) {
           </div>
         </motion.div>
       </motion.div>
+
+      {/* === CHAT PREVIEW MOCKUP SECTION === */}
+      <motion.section
+        className="relative z-10 py-20 px-4 sm:px-6 lg:px-8"
+        initial="hidden"
+        whileInView="visible"
+        viewport={{ once: false, amount: 0.3 }}
+        variants={sectionVariants}
+      >
+        {/* Background glow */}
+        <div className="absolute inset-0 bg-gradient-to-b from-blue-600/5 via-transparent to-transparent pointer-events-none" />
+
+        <motion.div
+          className="relative z-10 max-w-3xl mx-auto"
+          variants={previewCardVariants}
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: false, amount: 0.4 }}
+        >
+          <motion.div
+            className="rounded-3xl border border-blue-500/20 bg-gradient-to-br from-slate-800/40 to-slate-900/40 overflow-hidden shadow-2xl shadow-blue-500/10 backdrop-blur-xl"
+            animate="animate"
+            variants={previewFloatVariants}
+          >
+            {/* Chat Header */}
+            <div className="bg-gradient-to-r from-slate-800/60 to-slate-900/60 backdrop-blur-md border-b border-slate-700/50 px-6 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+                <span className="font-semibold text-white">ChatPro Live Preview</span>
+              </div>
+              <span className="text-xs text-blue-300">Streaming in real time</span>
+            </div>
+
+            {/* Chat Messages */}
+            <div className="p-6 space-y-4 min-h-64 bg-gradient-to-b from-slate-900/20 to-slate-950/40">
+              {/* User Message */}
+              <div className="flex justify-end">
+                <div className="max-w-xs bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl rounded-tr-lg px-4 py-3 text-white text-sm shadow-lg">
+                  Summarize quantum computing in simple terms.
+                </div>
+              </div>
+
+              {/* AI Message with streaming animation */}
+              <div className="flex justify-start">
+                <motion.div
+                  className="max-w-xs bg-slate-800/60 rounded-2xl rounded-tl-lg px-4 py-3 text-slate-200 text-sm border border-slate-700/50"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.3, delay: 0.2 }}
+                >
+                  <div className="space-y-2">
+                    {/* Streaming text reveal */}
+                    <motion.span
+                      className="inline"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ duration: 0.5, delay: 0.3 }}
+                    >
+                      Quantum computing uses qubits instead of regular bits, allowing computers to process multiple possibilities simultaneously.
+                    </motion.span>
+
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ duration: 0.5, delay: 0.9 }}
+                    >
+                      <span> This makes certain complex calculations dramatically faster than traditional computing.</span>
+                    </motion.div>
+
+                    {/* Typing indicator */}
+                    <motion.div
+                      className="flex gap-1 pt-1"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: 1.5 }}
+                    >
+                      <motion.span
+                        className="w-2 h-2 bg-blue-400 rounded-full"
+                        variants={typingDotVariants}
+                        animate="animate"
+                      />
+                      <motion.span
+                        className="w-2 h-2 bg-blue-400 rounded-full"
+                        variants={typingDotVariants}
+                        animate="animate"
+                        transition={{ delay: 0.2 }}
+                      />
+                      <motion.span
+                        className="w-2 h-2 bg-blue-400 rounded-full"
+                        variants={typingDotVariants}
+                        animate="animate"
+                        transition={{ delay: 0.4 }}
+                      />
+                    </motion.div>
+                  </div>
+                </motion.div>
+              </div>
+            </div>
+          </motion.div>
+        </motion.div>
+      </motion.section>
 
       {/* === WHY CHATPRO SECTION === */}
       <motion.section
