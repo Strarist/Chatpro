@@ -42,7 +42,7 @@ const MessageBubble = ({
         <div className="flex w-full max-w-4xl flex-col items-end gap-2 px-0.5 sm:px-2">
 
           {/* USER BUBBLE */}
-          <div className="max-w-[90%] rounded-[22px] bg-blue-600 px-4 py-3 text-[15px] leading-relaxed text-white shadow-sm shadow-black/25 transition-all duration-200 ease-out hover:bg-blue-500 hover:shadow-md hover:shadow-blue-950/20 sm:max-w-[82%] sm:rounded-[24px] sm:px-5 md:max-w-[74%] lg:max-w-[72%]">
+          <div className="max-w-[90%] rounded-2xl bg-gradient-to-br from-blue-600 to-blue-500 px-4 py-3 text-[15px] leading-relaxed text-white shadow-lg shadow-blue-950/30 transition-all duration-200 ease-out hover:from-blue-500 hover:to-blue-400 hover:shadow-xl hover:shadow-blue-950/40 sm:max-w-[82%] sm:px-5 md:max-w-[74%] lg:max-w-[72%]">
             {message.content}
           </div>
 
@@ -80,20 +80,20 @@ const MessageBubble = ({
           <div className="flex w-full max-w-[90%] flex-col gap-2 sm:max-w-[82%] md:max-w-[74%] lg:max-w-[72%]">
 
             {/* MESSAGE BUBBLE */}
-<div className="w-full overflow-hidden rounded-[22px] border border-[#1e293b] bg-[#0f172a] px-4 py-3 text-[15px] leading-relaxed text-slate-100 shadow-sm shadow-black/20 break-words transition-all duration-200 ease-out hover:border-[#334155] hover:shadow-md hover:shadow-black/25 sm:rounded-[24px] sm:px-5">
+<div className="w-full overflow-hidden rounded-2xl border border-slate-700/50 bg-slate-800/40 px-4 py-3 text-[15px] leading-relaxed text-slate-100 shadow-lg shadow-black/30 break-words transition-all duration-200 ease-out hover:border-slate-600/60 hover:bg-slate-800/50 hover:shadow-xl hover:shadow-black/40 backdrop-blur-md sm:px-5">
               <ReactMarkdown
                 components={{
                   p: ({ children }) => (
                     <p className="mb-3 leading-relaxed">{children}</p>
                   ),
                   h1: ({ children }) => (
-                    <h1 className="text-xl font-semibold mt-4 mb-2">{children}</h1>
+                    <h1 className="text-xl font-semibold mt-4 mb-2 text-slate-50">{children}</h1>
                   ),
                   h2: ({ children }) => (
-                    <h2 className="text-lg font-semibold mt-4 mb-2">{children}</h2>
+                    <h2 className="text-lg font-semibold mt-4 mb-2 text-slate-50">{children}</h2>
                   ),
                   strong: ({ children }) => (
-                    <strong className="font-semibold text-white">{children}</strong>
+                    <strong className="font-semibold text-slate-50">{children}</strong>
                   ),
                   ul: ({ children }) => (
                     <ul className="list-disc ml-5 space-y-2 mb-3">{children}</ul>
@@ -114,7 +114,7 @@ const MessageBubble = ({
                     }
 
                     return (
-                      <code className="bg-gray-800 px-1 py-0.5 rounded text-sm">
+                      <code className="bg-slate-700/60 px-2 py-1 rounded text-sm font-medium">
                         {children}
                       </code>
                     );
@@ -126,7 +126,7 @@ const MessageBubble = ({
 
               {/* STREAM CURSOR */}
               {message.isStreaming && (
-                <span className="ml-0.5 inline-block h-[1em] w-[2px] rounded-full bg-blue-200/80 align-[-0.125em] animate-pulse" />
+                <span className="ml-0.5 inline-block h-[1em] w-[2px] rounded-full bg-blue-300/80 align-[-0.125em] animate-pulse" />
               )}
             </div>
 

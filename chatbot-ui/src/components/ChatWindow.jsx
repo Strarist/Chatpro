@@ -395,8 +395,8 @@ const ChatWindow = ({ messages = [], setMessages }) => {
   };
 
   return (
-    <div className="flex min-h-screen min-w-0 flex-col bg-[#020617] text-slate-100">
-      <header className="sticky top-0 z-50 flex items-center justify-between gap-3 border-b border-[#1e293b] bg-[#020617]/80 px-3 py-3 backdrop-blur-md sm:px-5">
+    <div className="flex min-h-screen min-w-0 flex-col bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-slate-100">
+      <header className="sticky top-0 z-50 flex items-center justify-between gap-3 border-b border-slate-700/40 bg-slate-900/80 px-3 py-3 backdrop-blur-xl sm:px-5">
         <div className="flex min-w-0 items-center gap-3">
           <AppLogo />
           <div className="min-w-0 leading-tight">
@@ -411,8 +411,8 @@ const ChatWindow = ({ messages = [], setMessages }) => {
       {messages.length === 0 ? (
         <div className="flex flex-1 items-center justify-center">
           <div className="text-center">
-            <div className="text-3xl font-semibold text-gray-200">ChatPro</div>
-            <div className="mt-2 text-sm text-gray-400">
+            <div className="text-4xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">ChatPro</div>
+            <div className="mt-3 text-sm text-gray-400">
               Ask anything. Start a conversation.
             </div>
           </div>
@@ -420,7 +420,7 @@ const ChatWindow = ({ messages = [], setMessages }) => {
       ) : (
         <div
           ref={containerRef}
-          className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-3.5 overflow-y-auto px-2.5 py-4 sm:gap-4 sm:px-5 sm:py-5 md:px-8 lg:px-10"
+          className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-4 overflow-y-auto px-2.5 py-4 sm:gap-4 sm:px-5 sm:py-5 md:px-8 lg:px-10"
         >
           {messages.map((msg, i) => {
             if (msg.role === "user") {
@@ -509,7 +509,7 @@ const ChatWindow = ({ messages = [], setMessages }) => {
               <div className="text-[11px] tracking-[0.18em] uppercase mb-2 px-1 text-left text-slate-400">
                 AI
               </div>
-              <div className="max-w-[90%] rounded-[24px] border border-[#1e293b] bg-[#0f172a] px-4 py-4 text-slate-100 shadow-sm shadow-black/20 transition-all duration-200 ease-out sm:max-w-[82%] sm:px-5 md:max-w-[74%] lg:max-w-[72%]">
+              <div className="max-w-[90%] rounded-2xl border border-slate-700/50 bg-slate-800/40 px-4 py-4 text-slate-100 shadow-lg shadow-black/30 transition-all duration-200 ease-out sm:max-w-[82%] sm:px-5 md:max-w-[74%] lg:max-w-[72%] backdrop-blur-md">
                 <div className="flex items-center gap-1">
                   <span className="inline-block h-2 w-2 rounded-full bg-slate-400/80 animate-pulse" style={{ animationDelay: "0s" }} />
                   <span className="inline-block h-2 w-2 rounded-full bg-slate-400/70 animate-pulse" style={{ animationDelay: "0.12s" }} />

@@ -58,9 +58,11 @@ const InputBox = ({ value, setValue, onSend, onStop, isLoading }) => {
   return (
     <div
       className={`
-        flex min-w-0 items-end gap-2 rounded-2xl px-2.5 py-2.5 sm:gap-3 sm:px-4 sm:py-3
-        bg-[#020617] border transition-all duration-200 ease-out
-        ${isFocused ? "border-blue-500 shadow-sm shadow-blue-950/30 ring-1 ring-blue-500/25" : "border-[#1e293b]"}
+        flex min-w-0 items-end gap-2 rounded-2xl px-3 py-3 sm:gap-3 sm:px-4 sm:py-3.5
+        bg-slate-800/40 border backdrop-blur-md transition-all duration-300 ease-out
+        ${isFocused
+          ? "border-blue-500/50 shadow-lg shadow-blue-500/20 ring-1 ring-blue-500/30 bg-slate-800/60"
+          : "border-slate-700/40 shadow-md shadow-black/20"}
       `}
     >
       {/* TEXTAREA */}
@@ -78,8 +80,8 @@ const InputBox = ({ value, setValue, onSend, onStop, isLoading }) => {
         rows={1}
         className="
           min-w-0 flex-1 resize-none bg-transparent outline-none
-          text-gray-200 placeholder:text-gray-500
-          text-sm leading-relaxed
+          text-gray-100 placeholder:text-gray-500
+          text-sm leading-relaxed font-medium
           max-h-[120px] overflow-hidden
         "
       />
@@ -89,10 +91,10 @@ const InputBox = ({ value, setValue, onSend, onStop, isLoading }) => {
         <button
           onClick={onStop}
           className="
-            shrink-0 whitespace-nowrap rounded-full px-3 py-2 text-sm font-medium sm:px-4
-            bg-red-600 text-white
-            hover:bg-red-500 hover:brightness-110 active:scale-95
-            transition-all duration-200 ease-out
+            shrink-0 whitespace-nowrap rounded-full px-4 py-2 text-sm font-semibold sm:px-5
+            bg-gradient-to-r from-red-600 to-red-500 text-white
+            hover:from-red-500 hover:to-red-400 hover:shadow-lg hover:shadow-red-950/30 active:scale-95
+            transition-all duration-200 ease-out shadow-md shadow-red-950/20
           "
         >
           Stop
@@ -102,14 +104,14 @@ const InputBox = ({ value, setValue, onSend, onStop, isLoading }) => {
           onClick={handleSend}
           disabled={!value.trim()}
           className={`
-  shrink-0 whitespace-nowrap rounded-full px-3 py-2 text-sm font-medium sm:px-4
-  text-white transition-all duration-200 ease-out
-  ${
-    value.trim()
-      ? "bg-gradient-to-r from-blue-600 to-blue-500 shadow-md hover:brightness-110 hover:shadow-lg active:scale-95"
-      : "bg-blue-600/40 cursor-not-allowed opacity-70"
-  }
-`}
+            shrink-0 whitespace-nowrap rounded-full px-4 py-2 text-sm font-semibold sm:px-5
+            text-white transition-all duration-200 ease-out
+            ${
+              value.trim()
+                ? "bg-gradient-to-r from-blue-600 to-blue-500 shadow-lg shadow-blue-500/30 hover:from-blue-500 hover:to-blue-400 hover:shadow-xl hover:shadow-blue-500/40 active:scale-95"
+                : "bg-blue-600/30 cursor-not-allowed opacity-50"
+            }
+          `}
         >
           Send
         </button>
