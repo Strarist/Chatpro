@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import ChatWindow from "./components/ChatWindow";
 import Sidebar from "./components/Sidebar";
+import LandingPage from "./pages/LandingPage";
 
 const isLocalhost =
   typeof window !== "undefined" &&
@@ -26,6 +27,11 @@ const createDefaultChat = () => ({
 });
 
 function App() {
+  // =========================
+  // 🧠 SHOW CHAT STATE
+  // =========================
+  const [showChat, setShowChat] = useState(false);
+
   // =========================
   // 🧠 LOAD CHATS
   // =========================
@@ -155,6 +161,10 @@ function App() {
     });
   };
 
+  if (!showChat) {
+    return <LandingPage onStartChat={() => setShowChat(true)} />;
+  }
+
   return (
     <div className="flex h-screen min-w-0 overflow-hidden bg-[#0f172a] text-white sm:h-[100dvh]">
       <Sidebar
@@ -177,7 +187,7 @@ function App() {
             <div className="text-center">
               <h2 className="mb-2 text-lg">No chats yet</h2>
               <p className="text-sm">
-                Click “New Chat” to start a conversation
+                Click "New Chat" to start a conversation
               </p>
             </div>
           </div>
