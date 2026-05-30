@@ -56,12 +56,13 @@ export const createConversation = async (title = "New Chat") => {
  */
 export const fetchConversations = async () => {
   try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 s timeout
     const res = await fetch(`${API_URL}/conversations`, {
       method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
+      headers: { "Content-Type": "application/json" },
+      signal: controller.signal,
+    }).finally(() => clearTimeout(timeoutId));
 
     if (!res.ok) {
       throw new Error(`Failed to fetch conversations: ${res.statusText}`);
@@ -69,7 +70,11 @@ export const fetchConversations = async () => {
 
     return await res.json();
   } catch (error) {
-    console.error("Error fetching conversations:", error);
+    if (error.name === "AbortError") {
+      console.error("fetchConversations timeout after 10s");
+    } else {
+      console.error("Error fetching conversations:", error);
+    }
     return [];
   }
 };

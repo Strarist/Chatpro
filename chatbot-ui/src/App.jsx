@@ -72,7 +72,12 @@ const loadHasStartedChat = () => {
   if (typeof persistedChats === "string" && persistedChats.trim().length > 0) {
     const parsed = safeJsonParse(persistedChats, null);
     if (Array.isArray(parsed) && parsed.length > 0) {
-      return true;
+      // Only consider it a started chat if there is a real conversation
+      const hasReal = parsed.some(c =>
+        (c.title && c.title !== "New Chat") ||
+        (Array.isArray(c.messages) && c.messages.length > 1)
+      );
+      if (hasReal) return true;
     }
   }
 
@@ -133,6 +138,7 @@ function App() {
             }
           }
           
+          setShowChat(false);
           setUseBackend(false);
           setIsLoadingChats(false);
           return;
@@ -156,6 +162,7 @@ function App() {
         console.error("Failed to load from backend, falling back to localStorage:", error);
         setUseBackend(false);
         setChats(initialChats);
+        setShowChat(false);
       } finally {
         setIsLoadingChats(false);
       }
