@@ -109,6 +109,13 @@ function App() {
   const [isLoadingChats, setIsLoadingChats] = useState(true);
   const [useBackend, setUseBackend] = useState(true);
 
+  // Persist the chat view flag so a refresh keeps the UI open
+  useEffect(() => {
+    if (showChat) {
+      window.localStorage.setItem(STORAGE_KEYS.hasStartedChat, "true");
+    }
+  }, [showChat]);
+
   // Initial load from localStorage as fallback
   const initialChats = loadChats();
   const [chats, setChats] = useState(initialChats);
@@ -133,12 +140,13 @@ function App() {
               const migrated = await migrateLocalChatsToBackend(initialChats);
               setChats(migrated);
               setActiveChatId(migrated[0]?.id || initialChats[0]?.id);
+              setShowChat(true);
               window.localStorage?.setItem(STORAGE_KEYS.backendSynced, "true");
               return;
             }
           }
           
-          setShowChat(false);
+          setShowChat(true);
           setUseBackend(false);
           setIsLoadingChats(false);
           return;
@@ -157,6 +165,7 @@ function App() {
         }
         
         setUseBackend(true);
+        setShowChat(true);
         window.localStorage?.setItem(STORAGE_KEYS.backendSynced, "true");
       } catch (error) {
         console.error("Failed to load from backend, falling back to localStorage:", error);
