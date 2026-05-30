@@ -1,4 +1,5 @@
 import AppLogo from "./AppLogo";
+import EmptyState from "./EmptyState";
 
 const Sidebar = ({
   chats,
@@ -34,35 +35,41 @@ const Sidebar = ({
         <div className="px-2 pb-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
           Chats
         </div>
-        {chats.map((chat) => (
-          <div
-            key={chat.id}
-            onClick={() => {
-              setActiveChatId(chat.id);
-              onCloseMobile?.();
-            }}
-            className={`group flex cursor-pointer items-center justify-between gap-2 rounded-lg border px-2.5 py-2 text-sm transition-all duration-200 ease-out active:scale-[0.99] md:px-3 md:py-2.5 ${
-              activeChatId === chat.id
-                ? "border-blue-500/40 bg-blue-500/10 backdrop-blur-md text-gray-100 shadow-lg shadow-blue-950/20"
-                : "border-slate-700/30 text-gray-400 hover:border-slate-600/50 hover:bg-slate-800/40 hover:text-gray-200 hover:shadow-md hover:shadow-black/10 hover:backdrop-blur-md"
-            }`}
-          >
-            {/* Title */}
-            <span className="min-w-0 flex-1 truncate font-medium">{chat.title}</span>
-
-            {/* Delete Button */}
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                deleteChat(chat.id);
+        {chats.length > 0 ? (
+          chats.map((chat) => (
+            <div
+              key={chat.id}
+              onClick={() => {
+                setActiveChatId(chat.id);
+                onCloseMobile?.();
               }}
-              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-xs text-gray-500 opacity-0 transition-all duration-200 ease-out hover:bg-red-500/20 hover:text-red-400 active:scale-95 group-hover:opacity-100"
-              aria-label="Delete chat"
+              className={`group flex cursor-pointer items-center justify-between gap-2 rounded-lg border px-2.5 py-2 text-sm transition-all duration-200 ease-out active:scale-[0.99] md:px-3 md:py-2.5 ${
+                activeChatId === chat.id
+                  ? "border-blue-500/40 bg-blue-500/10 backdrop-blur-md text-gray-100 shadow-lg shadow-blue-950/20"
+                  : "border-slate-700/30 text-gray-400 hover:border-slate-600/50 hover:bg-slate-800/40 hover:text-gray-200 hover:shadow-md hover:shadow-black/10 hover:backdrop-blur-md"
+              }`}
             >
-              x
-            </button>
+              {/* Title */}
+              <span className="min-w-0 flex-1 truncate font-medium">{chat.title}</span>
+
+              {/* Delete Button */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  deleteChat(chat.id);
+                }}
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-xs text-gray-500 opacity-0 transition-all duration-200 ease-out hover:bg-red-500/20 hover:text-red-400 active:scale-95 group-hover:opacity-100"
+                aria-label="Delete chat"
+              >
+                x
+              </button>
+            </div>
+          ))
+        ) : (
+          <div className="px-2 py-4 text-center text-sm text-slate-600 italic">
+            No chats yet
           </div>
-        ))}
+        )}
       </div>
 
       <div className="border-t border-slate-700/40 p-2.5 sm:p-3 md:p-4">

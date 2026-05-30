@@ -775,22 +775,6 @@ const ChatWindow = ({ messages = [], conversationId, setMessages, onOpenSidebar 
         </div>
       </header>
 
-      {IS_DEV && (
-        <div className="pointer-events-none fixed bottom-2 left-2 z-[60] rounded-lg border border-slate-600/60 bg-slate-900/85 px-2.5 py-2 text-[11px] text-slate-200 shadow-lg shadow-black/40 backdrop-blur-md">
-          <div className="font-semibold uppercase tracking-[0.12em] text-slate-300">Stream</div>
-          <div className="mt-1">Status: {streamStatus}</div>
-          {devStreamMetrics && (
-            <>
-              <div>Mode: {devStreamMetrics.mode}</div>
-              <div>TTFT: {devStreamMetrics.ttftMs?.toFixed(0) ?? "-"} ms</div>
-              <div>Duration: {devStreamMetrics.durationMs?.toFixed(0) ?? "-"} ms</div>
-              <div>Finalize: {devStreamMetrics.finalizeMs?.toFixed(0) ?? "-"} ms</div>
-              <div>Chars/s: {devStreamMetrics.throughputPerSec}</div>
-            </>
-          )}
-        </div>
-      )}
-
       {messages.length === 0 ? (
         <div className="flex flex-1 items-center justify-center">
           <div className="text-center">

@@ -50,7 +50,7 @@ const safeJsonParse = (value, fallback) => {
 
 const loadChats = () => {
   if (typeof window === "undefined" || !window.localStorage) {
-    return [createDefaultChat()];
+    return [];
   }
 
   const saved = window.localStorage.getItem(STORAGE_KEYS.chats);
@@ -59,7 +59,7 @@ const loadChats = () => {
     return parsed;
   }
 
-  return [createDefaultChat()];
+  return [];
 };
 
 const loadHasStartedChat = () => {
@@ -290,9 +290,9 @@ function App() {
       const updated = prev.filter((chat) => chat.id !== id);
 
       if (!updated.length) {
-        const newChat = createDefaultChat();
-        setActiveChatId(newChat.id);
-        return [newChat];
+        // No chats left; clear active chat
+        setActiveChatId(null);
+        return [];
       }
 
       if (id === activeChatId) {

@@ -144,7 +144,7 @@ const MessageBubble = ({
   onNext,
 }) => {
   const [copied, setCopied] = useState(false);
-  const [reaction, setReaction] = useState(null);
+
   const isUser = message?.role === "user";
   const messageContent = message?.content ?? "";
   const isStreaming = Boolean(message?.isStreaming);
@@ -226,26 +226,6 @@ const MessageBubble = ({
             {!isStreaming && (
               <>
                 <div className="ml-1 flex items-center gap-3 text-xs text-gray-400 opacity-0 transition-all duration-200 ease-out group-hover:opacity-100">
-                  <button
-                    onClick={() => setReaction("up")}
-                    className={`rounded-md px-1 text-sm transition-all duration-200 ease-out active:scale-95 ${
-                      reaction === "up" ? "text-green-400" : "hover:text-gray-200"
-                    }`}
-                  >
-                    {"\u{1F44D}"}
-                  </button>
-
-                  <button
-                    onClick={() => setReaction("down")}
-                    className={`rounded-md px-1 text-sm transition-all duration-200 ease-out active:scale-95 ${
-                      reaction === "down" ? "text-red-400" : "hover:text-gray-200"
-                    }`}
-                  >
-                    {"\u{1F44E}"}
-                  </button>
-
-                  <span className="opacity-30">|</span>
-
                   <button
                     onClick={handleCopy}
                     className="rounded-md px-1 transition-all duration-200 ease-out hover:text-gray-200 active:scale-95"
