@@ -3,13 +3,11 @@ import InputBox from "./InputBox";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { streamAIResponse } from "../services/aiService";
 import { appendMessageToConversation } from "../services/conversationService";
-import { ModelSelector } from "./ModelSelector";
 import { useModelSelection } from "../hooks/useModelSelection";
 import { getModel } from "../config/models";
 import { useMarkdownProcessor } from "../utils/markdownProcessor";
 import { createStreamSessionId, isActiveStreamSession as checkActiveStreamSession } from "../utils/streamSession";
 import AppLogo from "./AppLogo";
-import ConnectionStatus from "./ConnectionStatus";
 import { Sparkles, Code2, FileText, Bug } from "lucide-react";
 
 const STARTER_PROMPTS = [
@@ -33,6 +31,9 @@ const STARTER_PROMPTS = [
 
 const AUTO_SCROLL_THRESHOLD = 150;
 const IS_DEV = import.meta.env.DEV;
+
+const generateMessageId = () =>
+  "msg_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8);
 const STREAM_STATUS = Object.freeze({
   IDLE: "idle",
   STARTING: "starting",
@@ -47,7 +48,6 @@ const ChatWindow = ({
   messages = [],
   conversationId,
   chatTitle = "New Chat",
-  backendConnected = false,
   setMessages,
   onOpenSidebar,
 }) => {
@@ -58,7 +58,7 @@ const ChatWindow = ({
   const [activeVersionMap, setActiveVersionMap] = useState({});
   const [showJumpToLatest, setShowJumpToLatest] = useState(false);
   const [streamStatus, setStreamStatus] = useState(STREAM_STATUS.IDLE);
-  const [devStreamMetrics, setDevStreamMetrics] = useState(null);
+  const [, setDevStreamMetrics] = useState(null);
   const [markdownMetaByMessageId, setMarkdownMetaByMessageId] = useState({});
 
   // Model selection
@@ -409,10 +409,6 @@ const ChatWindow = ({
       .catch(() => {});
   }, [messages, processMarkdown]);
 
-  const generateId = () => {
-    return "msg_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8);
-  };
-
   const sendMessage = async (content) => {
     const trimmedContent = String(content ?? "").trim();
     if (!trimmedContent || isLoading) return;
@@ -445,13 +441,13 @@ const ChatWindow = ({
 
     if (editIdx !== null) {
       const trimmed = messages.slice(0, editIdx);
-      const userId = generateId();
+      const userId = generateMessageId();
       updatedMessages = [...trimmed, { id: userId, role: "user", content: content.trim() }];
       setEditingIndex(null);
       setEditingText("");
       setActiveVersionMap({});
     } else {
-      const userId = generateId();
+      const userId = generateMessageId();
       updatedMessages = [...messages, { id: userId, role: "user", content: content.trim() }];
     }
 
@@ -466,7 +462,7 @@ const ChatWindow = ({
       setMessages((prev) => [
         ...prev,
         {
-          id: generateId(),
+          id: generateMessageId(),
           role: "assistant",
           content: "",
           isStreaming: true,
@@ -563,7 +559,7 @@ const ChatWindow = ({
         return [
           ...updated,
           {
-            id: generateId(),
+            id: generateMessageId(),
             role: "assistant",
             content: "Something went wrong. Please try again.",
             isStreaming: false,
@@ -642,7 +638,7 @@ const ChatWindow = ({
     try {
       controllerRef.current = new AbortController();
 
-      const newAssistantId = generateId();
+      const newAssistantId = generateMessageId();
       const parentKey = lastUser.id != null ? lastUser.id : `__user_slot_${realIndex}`;
 
       setMessages((prev) => [
@@ -821,15 +817,6 @@ const ChatWindow = ({
             <div className="hidden truncate text-xs text-slate-400 md:block">{chatTitle}</div>
           </div>
         </div>
-        <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-          <div className="hidden sm:block">
-            <ConnectionStatus connected={backendConnected} />
-          </div>
-          <ModelSelector
-            selectedModelKey={selectedModelKey}
-            onModelChange={handleModelChange}
-          />
-        </div>
       </header>
 
       {messages.length === 0 ? (
@@ -996,6 +983,8 @@ const ChatWindow = ({
           onSend={sendMessage}
           onStop={stopGeneration}
           isLoading={isLoading}
+          selectedModelKey={selectedModelKey}
+          onModelChange={handleModelChange}
         />
       </div>
     </div>

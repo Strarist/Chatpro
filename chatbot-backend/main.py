@@ -1,9 +1,6 @@
 import os
-import json
-from pathlib import Path
 from uuid import uuid4
 
-import requests
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -14,6 +11,13 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from load_env import load_app_env
 
 load_app_env()
+
+from providers import (
+    get_provider_for_model,
+    sse_error,
+    stream_groq_response,
+    stream_openrouter_response,
+)
 
 # Local imports (after .env is loaded)
 from db import init_db, get_db, ConversationModel, MessageModel
@@ -44,6 +48,13 @@ OPENROUTER_API_URL = os.getenv(
 )
 
 OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "openrouter/auto")
+
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+GROQ_API_URL = os.getenv(
+    "GROQ_API_URL",
+    "https://api.groq.com/openai/v1/chat/completions",
+)
+
 APP_TITLE = os.getenv("APP_TITLE", "BotGPT")
 
 MAX_TOKENS = int(os.getenv("MAX_TOKENS", "300"))
@@ -133,16 +144,6 @@ def error_response(code: str, message: str, status_code: int = 400):
             }
         },
     )
-
-
-def sse_error(message: str, error_type: str = "upstream_error"):
-    payload = {
-        "error": {
-            "message": message,
-            "type": error_type,
-        }
-    }
-    return f"data: {json.dumps(payload)}\n\n"
 
 
 # =========================
@@ -269,11 +270,12 @@ def delete_conversation(
 @app.post("/chat")
 def chat_endpoint(req: ChatRequest, db: Session = Depends(get_db)):
     """
-    Stream AI response using SSE via OpenRouter.
+    Stream AI response via OpenRouter or Groq (SSE passthrough).
     Message persistence is handled by the frontend after stream finalize.
     """
     raw_messages = req.messages
     selected_model = req.model or OPENROUTER_MODEL
+    provider = get_provider_for_model(selected_model)
 
     # System prompt
     system_prompt = {
@@ -317,83 +319,44 @@ def chat_endpoint(req: ChatRequest, db: Session = Depends(get_db)):
             status_code=400,
         )
 
-    if not OPENROUTER_API_KEY:
+    if provider == "groq" and not GROQ_API_KEY:
         return error_response(
             "missing_api_key",
-            "Missing API key configuration",
+            "Missing Groq API key configuration",
             status_code=500,
         )
 
-    # Stream generator
+    if provider == "openrouter" and not OPENROUTER_API_KEY:
+        return error_response(
+            "missing_api_key",
+            "Missing OpenRouter API key configuration",
+            status_code=500,
+        )
+
+    stream_kwargs = {
+        "messages": messages,
+        "model": selected_model,
+        "max_tokens": MAX_TOKENS,
+        "temperature": TEMPERATURE,
+        "connect_timeout": CONNECT_TIMEOUT,
+        "request_timeout": REQUEST_TIMEOUT,
+    }
+
     def generate():
-        response = None
-
-        try:
-            response = requests.post(
-                OPENROUTER_API_URL,
-                headers={
-                    "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-                    "Content-Type": "application/json",
-                    "Referer": APP_REFERER,
-                    "X-Title": APP_TITLE,
-                },
-                json={
-                    "model": selected_model,
-                    "messages": messages,
-                    "stream": True,
-                    "max_tokens": MAX_TOKENS,
-                    "temperature": TEMPERATURE,
-                },
-                stream=True,
-                timeout=(CONNECT_TIMEOUT, REQUEST_TIMEOUT),
+        if provider == "groq":
+            yield from stream_groq_response(
+                api_key=GROQ_API_KEY,
+                api_url=GROQ_API_URL,
+                **stream_kwargs,
             )
-
-            if response.status_code != 200:
-                body_text = response.text or ""
-                body_text = body_text.strip()
-                print(
-                    f"OPENROUTER ERROR: status={response.status_code} model={selected_model} body={body_text}"
-                )
-                yield sse_error(
-                    f"OpenRouter error: {body_text}",
-                    "upstream_http_error",
-                )
-                return
-
-            for line in response.iter_lines():
-                if not line:
-                    continue
-
-                decoded = line.decode("utf-8")
-
-                # Forward OpenRouter SSE lines unchanged
-                if decoded.startswith("data: "):
-                    yield decoded + "\n\n"
-
-        except requests.Timeout:
-            print("OPENROUTER TIMEOUT")
-            yield sse_error(
-                "Upstream AI service timed out.",
-                "timeout_error",
+        else:
+            yield from stream_openrouter_response(
+                api_key=OPENROUTER_API_KEY,
+                api_url=OPENROUTER_API_URL,
+                app_referer=APP_REFERER,
+                app_title=APP_TITLE,
+                **stream_kwargs,
             )
-
-        except requests.RequestException as e:
-            print("OPENROUTER REQUEST ERROR:", str(e))
-            yield sse_error(
-                "Upstream AI service unavailable.",
-                "request_error",
-            )
-
-        except Exception as e:
-            print("FULL ERROR:", str(e))
-            yield sse_error(
-                "Unexpected server error.",
-                "internal_error",
-            )
-
-        finally:
-            if response is not None:
-                response.close()
 
     return StreamingResponse(
         generate(),

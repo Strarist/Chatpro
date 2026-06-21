@@ -130,6 +130,10 @@ export const deleteConversation = async (conversationId) => {
  * Fetch all conversations with full message history.
  * Throws BackendUnavailableError when the API cannot be reached.
  */
+export const loadConversationMessages = async (conversationId) => {
+  return fetchConversation(conversationId);
+};
+
 export const fetchConversationsWithMessages = async () => {
   const conversations = await fetchConversations();
   if (!conversations?.length) {

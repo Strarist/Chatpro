@@ -16,15 +16,19 @@ const STORAGE_KEY = "chatpro.selectedModel";
  * Premium minimal UI for selecting AI models.
  * Persists selection to localStorage.
  */
-export const ModelSelector = ({ selectedModelKey, onModelChange }) => {
+export const ModelSelector = ({
+  selectedModelKey,
+  onModelChange,
+  variant = "header",
+}) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const isComposer = variant === "composer";
 
   const currentModel = getModel(selectedModelKey);
   const popularModels = getPopularModels();
   const categorizedModels = getModelsByCategory();
 
-  // Filter models by search term
   const getFilteredModels = () => {
     const term = searchTerm.toLowerCase();
     if (!term) return { popular: true };
@@ -51,41 +55,52 @@ export const ModelSelector = ({ selectedModelKey, onModelChange }) => {
     setSearchTerm("");
   };
 
+  const triggerClassName = isComposer
+    ? "flex min-w-0 max-w-[160px] items-center gap-1.5 rounded-lg border border-slate-700/50 bg-slate-900/30 px-2.5 py-1.5 text-xs text-slate-300 transition-all hover:border-slate-500 hover:bg-slate-800/50 hover:text-slate-100 sm:max-w-[180px]"
+    : "flex items-center gap-2 rounded-lg border border-slate-700/60 bg-slate-900/40 px-3 py-2 text-sm text-slate-300 transition-all hover:border-slate-500 hover:bg-slate-800/60 hover:text-slate-100 md:px-4 md:py-2.5";
+
+  const menuClassName = isComposer
+    ? "absolute bottom-full left-0 z-50 mb-2 w-80 rounded-lg border border-slate-700/60 bg-slate-900/95 shadow-2xl shadow-black/50 backdrop-blur-md sm:w-96"
+    : "absolute right-0 top-full z-50 mt-2 w-80 rounded-lg border border-slate-700/60 bg-slate-900/95 shadow-2xl shadow-black/50 backdrop-blur-md sm:w-96";
+
   return (
-    <div className="relative">
-      {/* Trigger Button */}
+    <div className="relative min-w-0">
       <button
+        type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 rounded-lg border border-slate-700/60 bg-slate-900/40 px-3 py-2 text-sm text-slate-300 transition-all hover:border-slate-500 hover:bg-slate-800/60 hover:text-slate-100 md:px-4 md:py-2.5"
+        className={triggerClassName}
         title="Click to change AI model"
+        aria-expanded={isOpen}
+        aria-haspopup="listbox"
       >
-        <span className="hidden sm:inline">🤖</span>
-        <span className="truncate max-w-[120px] font-medium md:max-w-none">
+        <span className={`truncate font-medium ${isComposer ? "max-w-[120px] sm:max-w-[140px]" : "max-w-[120px] md:max-w-none"}`}>
           {currentModel.name}
         </span>
         <svg
-          className={`h-4 w-4 shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`}
+          className={`h-3.5 w-3.5 shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`}
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
+          aria-hidden="true"
         >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d={isComposer ? "M5 10l7 7 7-7" : "M19 14l-7 7m0 0l-7-7m7 7V3"}
+          />
         </svg>
       </button>
 
-      {/* Dropdown Menu */}
       {isOpen && (
         <>
-          {/* Backdrop */}
           <div
             className="fixed inset-0 z-40"
             onClick={() => setIsOpen(false)}
             aria-hidden="true"
           />
 
-          {/* Menu */}
-          <div className="absolute right-0 top-full z-50 mt-2 w-80 rounded-lg border border-slate-700/60 bg-slate-900/95 shadow-2xl shadow-black/50 backdrop-blur-md sm:w-96">
-            {/* Search */}
+          <div className={menuClassName}>
             <div className="border-b border-slate-700/40 p-3">
               <input
                 autoFocus
@@ -97,9 +112,7 @@ export const ModelSelector = ({ selectedModelKey, onModelChange }) => {
               />
             </div>
 
-            {/* Models List */}
             <div className="max-h-96 overflow-y-auto">
-              {/* Popular Section (if not searching) */}
               {!searchTerm && (
                 <div>
                   <div className="border-b border-slate-700/20 px-4 py-2 text-xs font-semibold uppercase tracking-widest text-slate-500">
@@ -118,9 +131,7 @@ export const ModelSelector = ({ selectedModelKey, onModelChange }) => {
                 </div>
               )}
 
-              {/* Categorized or Filtered Section */}
               {!searchTerm ? (
-                // All providers organized by category
                 <>
                   {Object.entries(categorizedModels).map(([provider, models]) => (
                     <div key={provider}>
@@ -141,10 +152,8 @@ export const ModelSelector = ({ selectedModelKey, onModelChange }) => {
                   ))}
                 </>
               ) : (
-                // Search results
                 <>
                   {Object.entries(getFilteredModels()).map(([provider, models]) => {
-                    // Skip "popular" key
                     if (provider === "popular") return null;
 
                     return (
@@ -168,7 +177,6 @@ export const ModelSelector = ({ selectedModelKey, onModelChange }) => {
                 </>
               )}
 
-              {/* No results */}
               {searchTerm && Object.keys(getFilteredModels()).length === 0 && (
                 <div className="px-4 py-8 text-center text-sm text-slate-500">
                   No models found matching &quot;{searchTerm}&quot;
@@ -182,12 +190,10 @@ export const ModelSelector = ({ selectedModelKey, onModelChange }) => {
   );
 };
 
-/**
- * ModelOption - Individual model in dropdown
- */
 const ModelOption = ({ model, isSelected, onSelect }) => {
   return (
     <button
+      type="button"
       onClick={onSelect}
       className={`w-full rounded px-3 py-2 text-left text-sm transition-colors ${
         isSelected
@@ -220,5 +226,3 @@ const ModelOption = ({ model, isSelected, onSelect }) => {
     </button>
   );
 };
-
-

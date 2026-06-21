@@ -62,13 +62,15 @@ uvicorn main:app --reload
 
 Runs at `http://127.0.0.1:8000`
 
-Create a `.env` file at the project root (`Realtime-Chatbot/.env`) or in `chatbot-backend/.env` (root is checked second). Copy from [`chatbot-backend/.env.example`](chatbot-backend/.env.example) and set `OPENROUTER_API_KEY`.
+Create a `.env` file at the project root (`Realtime-Chatbot/.env`) or in `chatbot-backend/.env` (root is checked second). Copy from [`chatbot-backend/.env.example`](chatbot-backend/.env.example) and set `OPENROUTER_API_KEY` and/or `GROQ_API_KEY` depending on which models you use.
 
 ## Environment Variables
 
 See [`chatbot-backend/.env.example`](chatbot-backend/.env.example):
 
-- `OPENROUTER_API_KEY` — required for `/chat` streaming
+- `OPENROUTER_API_KEY` — required for OpenRouter models on `/chat`
+- `GROQ_API_KEY` — required for Groq models (e.g. `llama-3.3-70b-versatile`)
+- `GROQ_API_URL` — optional Groq endpoint override
 - `DATABASE_URL` — defaults to `sqlite:///./chatpro.db`
 - `FRONTEND_ORIGINS` — CORS allowlist
 - `REQUEST_TIMEOUT` / `CONNECT_TIMEOUT` — upstream timeouts
