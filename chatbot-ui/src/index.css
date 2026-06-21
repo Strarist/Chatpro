@@ -1,6 +1,15 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+.glass-panel {
+  @apply rounded-2xl border border-slate-700/50 bg-slate-900/30 backdrop-blur-lg;
+}
+
+.marketing-section {
+  @apply py-16 sm:py-20 lg:py-24;
+}
+
 /* Hide scrollbar (Chrome, Edge, Safari) */
 ::-webkit-scrollbar {
   width: 6px;

@@ -56,8 +56,9 @@ const InputBox = ({ value, setValue, onSend, onStop, isLoading }) => {
   };
 
   return (
-    <div
-      className={`
+    <div>
+      <div
+        className={`
         flex min-w-0 items-end gap-2 rounded-2xl px-3 py-3 sm:gap-3 sm:px-4 sm:py-3.5
         bg-slate-800/40 border backdrop-blur-md transition-all duration-300 ease-out
         ${
@@ -66,7 +67,7 @@ const InputBox = ({ value, setValue, onSend, onStop, isLoading }) => {
             : "border-slate-700/40 shadow-md shadow-black/20"
         }
       `}
-    >
+      >
       {/* TEXTAREA */}
       <textarea
         ref={textareaRef}
@@ -119,6 +120,10 @@ const InputBox = ({ value, setValue, onSend, onStop, isLoading }) => {
           Send
         </button>
       )}
+      </div>
+      <p className="mt-2 hidden text-center text-[11px] text-slate-500 md:block">
+        Enter to send · Shift+Enter for newline
+      </p>
     </div>
   );
 };

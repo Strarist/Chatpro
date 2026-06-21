@@ -9,12 +9,26 @@ import { getModel } from "../config/models";
 import { useMarkdownProcessor } from "../utils/markdownProcessor";
 import { createStreamSessionId, isActiveStreamSession as checkActiveStreamSession } from "../utils/streamSession";
 import AppLogo from "./AppLogo";
+import ConnectionStatus from "./ConnectionStatus";
+import { Sparkles, Code2, FileText, Bug } from "lucide-react";
 
 const STARTER_PROMPTS = [
-  "Explain async/await like I'm interviewing tomorrow",
-  "Write a Python function to merge two sorted lists",
-  "What makes a good portfolio project README?",
-  "Help me debug a React useEffect that runs twice",
+  {
+    text: "Explain async/await like I'm interviewing tomorrow",
+    icon: Sparkles,
+  },
+  {
+    text: "Write a Python function to merge two sorted lists",
+    icon: Code2,
+  },
+  {
+    text: "What makes a good portfolio project README?",
+    icon: FileText,
+  },
+  {
+    text: "Help me debug a React useEffect that runs twice",
+    icon: Bug,
+  },
 ];
 
 const AUTO_SCROLL_THRESHOLD = 150;
@@ -29,7 +43,14 @@ const STREAM_STATUS = Object.freeze({
   ERROR: "error",
 });
 
-const ChatWindow = ({ messages = [], conversationId, setMessages, onOpenSidebar }) => {
+const ChatWindow = ({
+  messages = [],
+  conversationId,
+  chatTitle = "New Chat",
+  backendConnected = false,
+  setMessages,
+  onOpenSidebar,
+}) => {
   const [isLoading, setIsLoading] = useState(false);
   const [editingIndex, setEditingIndex] = useState(null);
   const [editingText, setEditingText] = useState("");
@@ -782,8 +803,8 @@ const ChatWindow = ({ messages = [], conversationId, setMessages, onOpenSidebar 
 
   return (
     <div className="flex min-h-screen min-w-0 flex-col bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-slate-100">
-      <header className="sticky top-0 z-50 flex items-center justify-between gap-3 border-b border-slate-700/40 bg-slate-900/80 px-3 py-3 backdrop-blur-xl sm:px-5">
-        <div className="flex min-w-0 items-center gap-3">
+      <header className="sticky top-0 z-50 flex items-center justify-between gap-3 border-b border-slate-700/40 bg-slate-900/85 px-3 py-3 backdrop-blur-xl sm:px-5">
+        <div className="flex min-w-0 flex-1 items-center gap-3">
           <button
             onClick={() => onOpenSidebar?.()}
             className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-slate-700/60 text-slate-300 transition-colors hover:border-slate-500 hover:text-slate-100 md:hidden"
@@ -793,13 +814,17 @@ const ChatWindow = ({ messages = [], conversationId, setMessages, onOpenSidebar 
           </button>
           <AppLogo />
           <div className="min-w-0 leading-tight">
-            <div className="truncate text-sm font-semibold tracking-[-0.01em] text-gray-100">
+            <div className="truncate text-sm font-semibold tracking-tight text-gray-100">
               ChatPro
             </div>
-            <div className="truncate text-xs text-gray-500">AI Assistant</div>
+            <div className="truncate text-xs text-gray-500 md:hidden">AI workspace</div>
+            <div className="hidden truncate text-xs text-slate-400 md:block">{chatTitle}</div>
           </div>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+          <div className="hidden sm:block">
+            <ConnectionStatus connected={backendConnected} />
+          </div>
           <ModelSelector
             selectedModelKey={selectedModelKey}
             onModelChange={handleModelChange}
@@ -808,26 +833,31 @@ const ChatWindow = ({ messages = [], conversationId, setMessages, onOpenSidebar 
       </header>
 
       {messages.length === 0 ? (
-        <div className="flex flex-1 items-center justify-center px-4">
-          <div className="w-full max-w-lg text-center">
-            <div className="text-4xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
-              ChatPro
+        <div className="flex flex-1 items-center justify-center px-4 py-8">
+          <div className="w-full max-w-xl text-center">
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-blue-500/30 bg-blue-500/10">
+              <Sparkles className="h-7 w-7 text-blue-400" />
             </div>
-            <div className="mt-3 text-sm text-gray-400">
-              Ask anything. Pick a starter or type your own question.
-            </div>
-            <div className="mt-6 grid gap-2 sm:grid-cols-2">
-              {STARTER_PROMPTS.map((prompt) => (
+            <h2 className="text-2xl font-bold text-white sm:text-3xl">What can I help with?</h2>
+            <p className="mt-2 text-sm text-slate-400 sm:text-base">
+              Pick a starter below or type your own question in the box at the bottom.
+            </p>
+            <div className="mt-8 grid gap-3 sm:grid-cols-2">
+              {STARTER_PROMPTS.map(({ text, icon: Icon }) => (
                 <button
-                  key={prompt}
+                  key={text}
                   type="button"
-                  onClick={() => sendMessage(prompt)}
-                  className="rounded-xl border border-slate-700/60 bg-slate-800/40 px-3 py-2.5 text-left text-sm text-slate-200 transition-all duration-200 hover:border-blue-500/40 hover:bg-slate-800/70"
+                  onClick={() => sendMessage(text)}
+                  className="glass-panel flex items-start gap-3 px-4 py-3 text-left text-sm text-slate-200 transition-all hover:border-blue-500/40 hover:bg-slate-800/60"
                 >
-                  {prompt}
+                  <Icon className="mt-0.5 h-4 w-4 shrink-0 text-blue-400" />
+                  <span>{text}</span>
                 </button>
               ))}
             </div>
+            <p className="mt-6 text-xs text-slate-500">
+              Enter to send · Shift+Enter for newline
+            </p>
           </div>
         </div>
       ) : (
@@ -921,21 +951,18 @@ const ChatWindow = ({ messages = [], conversationId, setMessages, onOpenSidebar 
             {isLoading && !messages.some((msg) => msg.role === "assistant" && msg.isStreaming) && (
               <div className="group flex w-full justify-start animate-in fade-in slide-in-from-bottom-3 duration-200 ease-out">
                 <div className="relative w-full max-w-4xl px-1 sm:px-2">
-                  <div className="text-[11px] tracking-[0.18em] uppercase mb-2 px-1 text-left text-slate-400">
-                    AI
+                  <div className="mb-2 px-1 text-[11px] font-medium uppercase tracking-wider text-slate-500">
+                    ChatPro
                   </div>
-                  <div className="max-w-[90%] rounded-2xl border border-slate-700/50 bg-slate-800/40 px-4 py-4 text-slate-100 shadow-lg shadow-black/30 transition-all duration-200 ease-out sm:max-w-[82%] sm:px-5 md:max-w-[74%] lg:max-w-[72%] backdrop-blur-md">
-                    <div className="flex items-center gap-1">
+                  <div className="max-w-[90%] rounded-2xl border border-slate-700/50 bg-slate-800/40 px-4 py-4 shadow-lg shadow-black/20 backdrop-blur-md sm:max-w-[82%] sm:px-5">
+                    <div className="flex items-center gap-1.5">
+                      <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-blue-400/80" />
                       <span
-                        className="inline-block h-2 w-2 rounded-full bg-slate-400/80 animate-pulse"
-                        style={{ animationDelay: "0s" }}
-                      />
-                      <span
-                        className="inline-block h-2 w-2 rounded-full bg-slate-400/70 animate-pulse"
+                        className="inline-block h-2 w-2 animate-pulse rounded-full bg-blue-400/70"
                         style={{ animationDelay: "0.12s" }}
                       />
                       <span
-                        className="inline-block h-2 w-2 rounded-full bg-slate-400/60 animate-pulse"
+                        className="inline-block h-2 w-2 animate-pulse rounded-full bg-blue-400/60"
                         style={{ animationDelay: "0.24s" }}
                       />
                     </div>

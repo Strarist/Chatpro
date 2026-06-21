@@ -117,6 +117,7 @@ function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isLoadingChats, setIsLoadingChats] = useState(true);
   const [useBackend, setUseBackend] = useState(true);
+  const [backendConnected, setBackendConnected] = useState(false);
   const autoCreateAttemptedRef = useRef(false);
 
   useEffect(() => {
@@ -141,6 +142,7 @@ function App() {
         const backendOnline = await checkBackendHealth();
         if (!backendOnline) {
           setUseBackend(false);
+          setBackendConnected(false);
           setChats(initialChats);
           setShowChat(shouldRestoreWorkspace);
           if (shouldRestoreWorkspace && initialChats.length > 0) {
@@ -165,12 +167,14 @@ function App() {
               setActiveChatId(migrated[0]?.id || initialChats[0]?.id);
               setShowChat(true);
               setUseBackend(true);
+              setBackendConnected(true);
               window.localStorage?.setItem(STORAGE_KEYS.backendSynced, "true");
               return;
             }
           }
 
           setUseBackend(true);
+          setBackendConnected(true);
           setShowChat(shouldRestoreWorkspace);
           if (shouldRestoreWorkspace && initialChats.length > 0) {
             setChats(initialChats);
@@ -192,6 +196,7 @@ function App() {
         }
 
         setUseBackend(true);
+        setBackendConnected(true);
         setShowChat(true);
         window.localStorage?.setItem(STORAGE_KEYS.backendSynced, "true");
       } catch (error) {
@@ -201,6 +206,7 @@ function App() {
           console.error("Failed to load from backend, falling back to localStorage:", error);
         }
         setUseBackend(false);
+        setBackendConnected(false);
         setChats(initialChats);
         setShowChat(shouldRestoreWorkspace);
         if (shouldRestoreWorkspace && initialChats.length > 0) {
@@ -266,6 +272,7 @@ function App() {
           updateConversationTitle(chat.id, updatedTitle).catch((error) => {
             if (error instanceof BackendUnavailableError) {
               setUseBackend(false);
+              setBackendConnected(false);
               return;
             }
             console.error(error);
@@ -292,6 +299,7 @@ function App() {
         if (error instanceof BackendUnavailableError) {
           console.warn("Backend unavailable — new chat saved locally only.");
           setUseBackend(false);
+          setBackendConnected(false);
         } else {
           console.error("Error creating conversation on backend:", error);
         }
@@ -325,6 +333,7 @@ function App() {
       } catch (error) {
         if (error instanceof BackendUnavailableError) {
           setUseBackend(false);
+          setBackendConnected(false);
         } else {
           console.error("Error deleting conversation on backend:", error);
         }
@@ -393,13 +402,16 @@ function App() {
         deleteChat={deleteChat}
         isOpen={isSidebarOpen}
         onCloseMobile={() => setIsSidebarOpen(false)}
+        backendConnected={backendConnected}
       />
 
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="flex min-w-0 flex-1 flex-col border-l border-slate-800/60">
         {activeChat ? (
           <ChatWindow
             key={activeChat.id}
             conversationId={useBackend ? activeChat.id : null}
+            chatTitle={activeChat.title}
+            backendConnected={backendConnected}
             messages={activeChat.messages}
             setMessages={updateMessages}
             onOpenSidebar={() => setIsSidebarOpen(true)}

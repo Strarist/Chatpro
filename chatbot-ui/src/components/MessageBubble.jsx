@@ -180,6 +180,9 @@ const MessageBubble = ({
     >
       {isUser ? (
         <div className="flex w-full max-w-4xl flex-col items-end gap-2 px-0.5 sm:px-2">
+          <div className="hidden w-full max-w-[90%] px-1 text-right text-[11px] font-medium uppercase tracking-wider text-slate-500 sm:block sm:max-w-[82%] md:max-w-[74%] lg:max-w-[72%]">
+            You
+          </div>
           <div className="max-w-[90%] rounded-2xl bg-gradient-to-br from-blue-600 to-blue-500 px-4 py-3 text-[15px] leading-relaxed text-white shadow-lg shadow-blue-950/30 transition-all duration-200 ease-out hover:from-blue-500 hover:to-blue-400 hover:shadow-xl hover:shadow-blue-950/40 sm:max-w-[82%] sm:px-5 md:max-w-[74%] lg:max-w-[72%]">
             {messageContent}
           </div>
@@ -211,6 +214,9 @@ const MessageBubble = ({
           </div>
 
           <div className="flex w-full max-w-[90%] flex-col gap-2 sm:max-w-[82%] md:max-w-[74%] lg:max-w-[72%]">
+            <div className="hidden px-1 text-[11px] font-medium uppercase tracking-wider text-slate-500 sm:block">
+              ChatPro
+            </div>
             <div className="w-full min-h-[2.75rem] overflow-hidden rounded-2xl border border-slate-700/50 bg-slate-800/40 px-4 py-3 text-[15px] text-slate-100 shadow-lg shadow-black/30 break-words transition-all duration-200 ease-out hover:border-slate-600/60 hover:bg-slate-800/50 hover:shadow-xl hover:shadow-black/40 backdrop-blur-md sm:px-5">
               {isStreaming ? (
                 <div className="whitespace-pre-wrap break-words leading-7 text-slate-100 [text-wrap:pretty]">
