@@ -1,142 +1,46 @@
-# 🚀 ChatPro — AI Chat Application
+# ChatPro — AI Chat Application
 
-<p align="center">
-  <strong>A production-style AI chat application inspired by modern conversational interfaces.</strong>
-</p>
+A production-style AI chat platform with real-time SSE streaming, persistent multi-chat conversations, and privacy-safe per-browser isolation.
 
-<p align="center">
-  Built with React, FastAPI, streaming UX patterns, and production-focused frontend architecture.
-</p>
+## Highlights
 
----
+- Real OpenRouter SSE streaming (not simulated typing)
+- Stream session ownership guards (stop / regenerate / chat-switch safe)
+- Plain-text streaming, markdown + syntax highlighting after finalize
+- Backend conversation persistence (FastAPI + SQLAlchemy + SQLite)
+- Per-visitor privacy via `X-Client-ID` + `owner_id` filtering
+- Multi-model selection with grouped provider UI
+- Workerized post-stream markdown analysis for large code blocks
 
-A production-style ChatGPT-inspired AI chat application built with React and FastAPI.
+## Tech Stack
 
-## Overview
+| Layer | Stack |
+| --- | --- |
+| Frontend | React, Vite, Tailwind CSS, Framer Motion, React Markdown |
+| Backend | FastAPI, SQLAlchemy, SQLite |
+| AI | OpenRouter streaming API |
 
-ChatPro is a modern multi-chat AI application focused on:
+## Project Structure
 
-* polished UI/UX
-* streaming AI responses
-* reliable async handling
-* multi-chat management
-* frontend architecture quality
-* production-oriented interaction design
-
-The project emphasizes real-world frontend engineering patterns rather than overly complex infrastructure.
-
----
-
-# ✨ Features
-
-## 🗂️ Multi-Chat System
-
-* Multiple chat sessions
-* Sidebar-based chat navigation
-* Auto-generated chat titles
-* Delete chat support
-* Persistent active chat state
-
-## ⚡ Streaming Responses
-
-* Simulated streaming experience
-* Stop generation support
-* Regenerate AI response
-* Request isolation handling
-* Async race-condition protection
-
-## 💾 Persistent State
-
-* LocalStorage persistence
-* Chat history retention
-* Active chat restoration
-* Lightweight memory system
-
-## 📝 Rich Message Rendering
-
-* Markdown rendering
-* Syntax-highlighted code blocks
-* Responsive message bubbles
-* Copy/Edit actions
-* Reaction controls
-
-## 🎨 Modern UI/UX
-
-* Dark premium interface
-* Responsive centered layout
-* Hover interactions
-* Smooth transitions
-* Product-style sidebar
-* Auto-resizing input
-
----
-
-# 🛠️ Tech Stack
-
-## Frontend
-
-| Technology               | Purpose                 |
-| ------------------------ | ----------------------- |
-| React                    | Frontend UI             |
-| Vite                     | Build tooling           |
-| Tailwind CSS             | Styling system          |
-| React Markdown           | Markdown rendering      |
-| React Syntax Highlighter | Code block highlighting |
-
-* React
-* Vite
-* Tailwind CSS
-* React Markdown
-* React Syntax Highlighter
-
-## Backend
-
-| Technology     | Purpose              |
-| -------------- | -------------------- |
-| FastAPI        | API server           |
-| Python         | Backend runtime      |
-| OpenRouter API | AI model integration |
-
-* FastAPI
-* Python
-* OpenRouter API
-
----
-
-# 📁 Project Structure
-
-```bash
+```text
 chatbot-ui/
-├── src/
-│   ├── components/
-│   │   ├── ChatWindow.jsx
-│   │   ├── InputBox.jsx
-│   │   ├── MessageBubble.jsx
-│   │   └── Sidebar.jsx
-│   ├── hooks/
-│   │   └── useChat.js
-│   ├── utils/
-│   └── App.jsx
-│
+  src/
+    components/     Chat UI (ChatWindow, MessageBubble, Sidebar, ...)
+    services/       aiService, conversationService, sseParser
+    utils/          clientId, apiClient, streamSession, markdownProcessor
+    workers/        markdownWorker (post-stream optimization)
+    config/         models.js
+
 chatbot-backend/
-├── main.py
-└── requirements.txt
+  main.py           FastAPI routes + SSE proxy + privacy middleware
+  db.py             SQLAlchemy models
+  schemas.py        Pydantic API schemas
+  test_main.py      Owner isolation + persistence tests
 ```
 
----
+## Local Setup
 
-# ⚙️ Installation
-
-## Clone Repository
-
-```bash
-git clone <your-repo-url>
-cd Realtime-Chatbot
-```
-
----
-
-# 💻 Frontend Setup
+### Frontend
 
 ```bash
 cd chatbot-ui
@@ -144,134 +48,70 @@ npm install
 npm run dev
 ```
 
-Frontend runs on:
+Runs at `http://localhost:5173`
 
-```bash
-http://localhost:5173
-```
-
----
-
-# 🔧 Backend Setup
+### Backend
 
 ```bash
 cd chatbot-backend
 python -m venv .venv
-```
-
-Activate environment:
-
-## Windows
-
-```bash
-.venv\Scripts\activate
-```
-
-## Install Dependencies
-
-```bash
+.venv\Scripts\activate   # Windows
 pip install -r requirements.txt
-```
-
-Run backend:
-
-```bash
 uvicorn main:app --reload
 ```
 
-Backend runs on:
+Runs at `http://127.0.0.1:8000`
+
+Create a `.env` file at the project root (`Realtime-Chatbot/.env`) or in `chatbot-backend/.env` (root is checked second). Copy from [`chatbot-backend/.env.example`](chatbot-backend/.env.example) and set `OPENROUTER_API_KEY`.
+
+## Environment Variables
+
+See [`chatbot-backend/.env.example`](chatbot-backend/.env.example):
+
+- `OPENROUTER_API_KEY` — required for `/chat` streaming
+- `DATABASE_URL` — defaults to `sqlite:///./chatpro.db`
+- `FRONTEND_ORIGINS` — CORS allowlist
+- `REQUEST_TIMEOUT` / `CONNECT_TIMEOUT` — upstream timeouts
+
+Optional frontend override: `VITE_API_URL`
+
+## Architecture Notes
+
+### Streaming lifecycle
+
+Assistant messages render as lightweight plain text during token streaming. After finalize, markdown and syntax highlighting are enabled. Stream writes/finalize paths are guarded by explicit session ownership in `ChatWindow.jsx`.
+
+### Privacy model
+
+There is no account auth. Each browser gets a stable UUID in localStorage, sent as `X-Client-ID`. Backend stores `owner_id` on conversations and filters all CRUD by owner.
+
+### Persistence model
+
+Hybrid local + backend:
+
+1. UI updates immediately in React state / localStorage
+2. On stream finalize, user + assistant messages append to backend
+3. On startup, backend conversations are fetched with full message history and merged with local cache by conversation ID
+
+## Tests
 
 ```bash
-http://127.0.0.1:8000
+# Frontend
+cd chatbot-ui
+npm test
+
+# Backend
+cd chatbot-backend
+pytest
 ```
 
----
+## Deployment
 
-# 🔐 Environment Variables
+- Frontend: Vercel (`chatbot-ui`)
+- Backend: Render (`chatbot-backend`)
 
-Create a `.env` file inside `chatbot-backend/`
+SQLite on Render is suitable for portfolio/demo usage. For multi-user production scale, migrate `DATABASE_URL` to PostgreSQL while keeping the same SQLAlchemy models and owner isolation model.
 
-```env
-OPENROUTER_API_KEY=your_api_key_here
-```
+## License
 
----
-
-# 🧠 Engineering Focus Areas
-
-This project focuses on:
-
-* async UI handling
-* frontend state management
-* streaming UX
-* React component architecture
-* production-grade UI refinement
-* scalable chat state handling
-* request cancellation safety
-* interaction polish
-
----
-
-# 📌 Current Status
-
-## Implemented
-
-* Multi-chat support
-* Streaming responses
-* Regenerate response
-* Stop generation
-* Markdown rendering
-* Syntax highlighting
-* Persistent storage
-* Memory extraction system
-* Responsive modern UI
-
-## In Progress
-
-* Final responsive polish
-* Layout refinement
-* Advanced UX interactions
-
----
-
-# 📸 Screenshots
-
-<img width="100%" alt="ChatPro Preview" src="./screenshots/chatpro-preview.png" />
-
-> Replace with actual screenshots after deployment/UI finalization.
-
----
-
-# 🔮 Future Improvements
-
-Planned improvements intentionally reserved for future projects:
-
-* authentication
-* realtime collaboration
-* websocket streaming
-* model switching
-* voice input
-* file uploads
-* vector memory
-* advanced tool calling
-
----
-
-# 👨‍💻 Author
-
-Aditya Gupta
-
-B.Tech — Computer Science Engineering
-
-Focused on:
-
-* Full Stack Development
-* Cloud Engineering
-* AI Applications
-* Frontend Systems
-
----
-
-# 📄 License
-
-This project is for educational and portfolio purposes.
+Educational and portfolio use.

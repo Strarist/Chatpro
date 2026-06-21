@@ -1,5 +1,4 @@
 import AppLogo from "./AppLogo";
-import EmptyState from "./EmptyState";
 
 const Sidebar = ({
   chats,
@@ -16,7 +15,6 @@ const Sidebar = ({
         isOpen ? "translate-x-0" : "-translate-x-full"
       }`}
     >
-      {/* New Chat Button */}
       <div className="p-2.5 sm:p-3 md:p-4">
         <button
           onClick={() => {
@@ -30,7 +28,6 @@ const Sidebar = ({
         </button>
       </div>
 
-      {/* Chat List */}
       <div className="flex-1 space-y-1 overflow-y-auto px-2 pb-3 sm:space-y-1.5 sm:px-3">
         <div className="px-2 pb-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
           Chats
@@ -49,10 +46,8 @@ const Sidebar = ({
                   : "border-slate-700/30 text-gray-400 hover:border-slate-600/50 hover:bg-slate-800/40 hover:text-gray-200 hover:shadow-md hover:shadow-black/10 hover:backdrop-blur-md"
               }`}
             >
-              {/* Title */}
               <span className="min-w-0 flex-1 truncate font-medium">{chat.title}</span>
 
-              {/* Delete Button */}
               <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -66,8 +61,18 @@ const Sidebar = ({
             </div>
           ))
         ) : (
-          <div className="px-2 py-4 text-center text-sm text-slate-600 italic">
-            No chats yet
+          <div className="px-2 py-6 text-center">
+            <p className="text-sm text-slate-500">No conversations yet</p>
+            <button
+              type="button"
+              onClick={() => {
+                createNewChat();
+                onCloseMobile?.();
+              }}
+              className="mt-3 rounded-lg border border-blue-500/30 bg-blue-500/10 px-3 py-2 text-xs font-medium text-blue-200 transition-colors hover:border-blue-400/50 hover:bg-blue-500/20"
+            >
+              Start your first chat
+            </button>
           </div>
         )}
       </div>

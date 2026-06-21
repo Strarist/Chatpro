@@ -2,11 +2,20 @@ import MessageBubble from "./MessageBubble";
 import InputBox from "./InputBox";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { streamAIResponse } from "../services/aiService";
+import { appendMessageToConversation } from "../services/conversationService";
 import { ModelSelector } from "./ModelSelector";
 import { useModelSelection } from "../hooks/useModelSelection";
 import { getModel } from "../config/models";
 import { useMarkdownProcessor } from "../utils/markdownProcessor";
+import { createStreamSessionId, isActiveStreamSession as checkActiveStreamSession } from "../utils/streamSession";
 import AppLogo from "./AppLogo";
+
+const STARTER_PROMPTS = [
+  "Explain async/await like I'm interviewing tomorrow",
+  "Write a Python function to merge two sorted lists",
+  "What makes a good portfolio project README?",
+  "Help me debug a React useEffect that runs twice",
+];
 
 const AUTO_SCROLL_THRESHOLD = 150;
 const IS_DEV = import.meta.env.DEV;
@@ -29,6 +38,7 @@ const ChatWindow = ({ messages = [], conversationId, setMessages, onOpenSidebar 
   const [showJumpToLatest, setShowJumpToLatest] = useState(false);
   const [streamStatus, setStreamStatus] = useState(STREAM_STATUS.IDLE);
   const [devStreamMetrics, setDevStreamMetrics] = useState(null);
+  const [markdownMetaByMessageId, setMarkdownMetaByMessageId] = useState({});
 
   // Model selection
   const { selectedModelKey, handleModelChange } = useModelSelection();
@@ -160,29 +170,38 @@ const ChatWindow = ({ messages = [], conversationId, setMessages, onOpenSidebar 
     shouldAutoScrollRef.current = true;
   }, []);
 
-  const createStreamSessionId = useCallback(() => {
-    if (typeof window !== "undefined" && window.crypto?.randomUUID) {
-      return window.crypto.randomUUID();
-    }
-    return `stream_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
-  }, []);
+  const createStreamSessionIdLocal = useCallback(() => createStreamSessionId(), []);
 
   const beginStreamSession = useCallback(() => {
-    const sessionId = createStreamSessionId();
+    const sessionId = createStreamSessionIdLocal();
     streamSessionRef.current = sessionId;
     return sessionId;
-  }, [createStreamSessionId]);
+  }, [createStreamSessionIdLocal]);
 
   const invalidateStreamSession = useCallback(() => {
     streamSessionRef.current = null;
   }, []);
 
   const isActiveStreamSession = useCallback((requestId, sessionId) => {
-    return (
-      isMountedRef.current &&
-      activeRequestIdRef.current === requestId &&
-      streamSessionRef.current === sessionId
+    return checkActiveStreamSession(
+      requestId,
+      sessionId,
+      activeRequestIdRef.current,
+      streamSessionRef.current,
+      isMountedRef.current
     );
+  }, []);
+
+  const persistExchange = useCallback((convId, userContent, assistantContent) => {
+    if (!convId || !userContent?.trim() || !assistantContent?.trim()) return;
+
+    appendMessageToConversation(convId, "user", userContent.trim()).catch(() => {});
+    appendMessageToConversation(convId, "assistant", assistantContent.trim()).catch(() => {});
+  }, []);
+
+  const persistAssistantMessage = useCallback((convId, assistantContent) => {
+    if (!convId || !assistantContent?.trim()) return;
+    appendMessageToConversation(convId, "assistant", assistantContent.trim()).catch(() => {});
   }, []);
 
   const finalizeStreamingResponse = useCallback(() => {
@@ -358,7 +377,15 @@ const ChatWindow = ({ messages = [], conversationId, setMessages, onOpenSidebar 
       return;
     }
 
-    processMarkdown(lastMessage.content).catch(() => {});
+    processMarkdown(lastMessage.content)
+      .then(({ metadata }) => {
+        if (!metadata) return;
+        setMarkdownMetaByMessageId((prev) => ({
+          ...prev,
+          [lastMessage.id]: metadata,
+        }));
+      })
+      .catch(() => {});
   }, [messages, processMarkdown]);
 
   const generateId = () => {
@@ -426,7 +453,7 @@ const ChatWindow = ({ messages = [], conversationId, setMessages, onOpenSidebar 
         },
       ]);
 
-      await streamAIResponse(
+      const finalText = await streamAIResponse(
         updatedMessages,
         (incomingText) => {
           if (!isActiveStreamSession(requestId, streamSessionId)) {
@@ -471,6 +498,9 @@ const ChatWindow = ({ messages = [], conversationId, setMessages, onOpenSidebar 
         };
         return updated;
       });
+
+      const userContent = updatedMessages[updatedMessages.length - 1]?.content;
+      persistExchange(conversationId, userContent, finalText);
     } catch (err) {
       if (err.name === "AbortError") {
         terminalStatus = STREAM_STATUS.ABORTED;
@@ -610,7 +640,7 @@ const ChatWindow = ({ messages = [], conversationId, setMessages, onOpenSidebar 
         [parentKey]: newAssistantId,
       }));
 
-      await streamAIResponse(
+      const finalText = await streamAIResponse(
         baseMessages,
         (incomingText) => {
           if (!isActiveStreamSession(requestId, streamSessionId)) {
@@ -659,6 +689,8 @@ const ChatWindow = ({ messages = [], conversationId, setMessages, onOpenSidebar 
 
         return updated;
       });
+
+      persistAssistantMessage(conversationId, finalText);
     } catch (err) {
       if (err.name === "AbortError") {
         terminalStatus = STREAM_STATUS.ABORTED;
@@ -776,12 +808,26 @@ const ChatWindow = ({ messages = [], conversationId, setMessages, onOpenSidebar 
       </header>
 
       {messages.length === 0 ? (
-        <div className="flex flex-1 items-center justify-center">
-          <div className="text-center">
+        <div className="flex flex-1 items-center justify-center px-4">
+          <div className="w-full max-w-lg text-center">
             <div className="text-4xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
               ChatPro
             </div>
-            <div className="mt-3 text-sm text-gray-400">Ask anything. Start a conversation.</div>
+            <div className="mt-3 text-sm text-gray-400">
+              Ask anything. Pick a starter or type your own question.
+            </div>
+            <div className="mt-6 grid gap-2 sm:grid-cols-2">
+              {STARTER_PROMPTS.map((prompt) => (
+                <button
+                  key={prompt}
+                  type="button"
+                  onClick={() => sendMessage(prompt)}
+                  className="rounded-xl border border-slate-700/60 bg-slate-800/40 px-3 py-2.5 text-left text-sm text-slate-200 transition-all duration-200 hover:border-blue-500/40 hover:bg-slate-800/70"
+                >
+                  {prompt}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       ) : (
@@ -791,6 +837,10 @@ const ChatWindow = ({ messages = [], conversationId, setMessages, onOpenSidebar 
             className="flex w-full flex-1 flex-col gap-4 overflow-y-auto px-2.5 py-4 sm:gap-4 sm:px-5 sm:py-5 md:px-8 lg:px-10"
           >
             {messages.map((msg, i) => {
+              const hasLargeCodeBlock = Boolean(
+                markdownMetaByMessageId[msg.id]?.hasLargeCodeBlock
+              );
+
               if (msg.role === "user") {
                 return (
                   <MessageBubble
@@ -810,6 +860,7 @@ const ChatWindow = ({ messages = [], conversationId, setMessages, onOpenSidebar 
                     onRegenerate={canRegenerate(msg, i) ? regenerateResponse : undefined}
                     versionIndex={0}
                     totalVersions={1}
+                    hasLargeCodeBlock={hasLargeCodeBlock}
                   />
                 );
               }
@@ -823,6 +874,7 @@ const ChatWindow = ({ messages = [], conversationId, setMessages, onOpenSidebar 
                     onRegenerate={canRegenerate(msg, i) ? regenerateResponse : undefined}
                     versionIndex={0}
                     totalVersions={1}
+                    hasLargeCodeBlock={hasLargeCodeBlock}
                   />
                 );
               }
@@ -845,6 +897,7 @@ const ChatWindow = ({ messages = [], conversationId, setMessages, onOpenSidebar 
                   onRegenerate={canRegenerate(msg, i) ? regenerateResponse : undefined}
                   versionIndex={currentIndex}
                   totalVersions={siblings.length}
+                  hasLargeCodeBlock={hasLargeCodeBlock}
                   onPrev={() => {
                     if (currentIndex > 0) {
                       setActiveVersionMap((prev) => ({

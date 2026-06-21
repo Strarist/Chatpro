@@ -4,24 +4,24 @@ from pathlib import Path
 from uuid import uuid4
 
 import requests
-from dotenv import load_dotenv
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from sqlalchemy.orm import Session
+from starlette.middleware.base import BaseHTTPMiddleware
 
-# Local imports
+from load_env import load_app_env
+
+load_app_env()
+
+# Local imports (after .env is loaded)
 from db import init_db, get_db, ConversationModel, MessageModel
 from schemas import (
     ChatRequest, MessageAppendRequest, ConversationCreateRequest,
     ConversationUpdateRequest, ConversationResponse, ConversationListResponse,
     MessageResponse
 )
-
-
-# Load .env from the same directory as this file
-load_dotenv(dotenv_path=Path(__file__).with_name(".env"))
 
 
 @asynccontextmanager
@@ -66,6 +66,46 @@ APP_REFERER = os.getenv(
     FRONTEND_ORIGINS[0] if FRONTEND_ORIGINS else "http://localhost:5173",
 )
 
+CLIENT_ID_HEADER = "X-Client-ID"
+
+
+class ClientIdMiddleware(BaseHTTPMiddleware):
+    """Ensure every request has a stable client identity for conversation ownership."""
+
+    async def dispatch(self, request: Request, call_next):
+        client_id = request.headers.get(CLIENT_ID_HEADER, "").strip()
+        if not client_id:
+            client_id = str(uuid4())
+
+        request.state.client_id = client_id
+        response = await call_next(request)
+        response.headers[CLIENT_ID_HEADER] = client_id
+        return response
+
+
+def get_owner_id(request: Request) -> str:
+    return request.state.client_id
+
+
+def get_owned_conversation(
+    conversation_id: str,
+    owner_id: str,
+    db: Session,
+) -> ConversationModel:
+    conversation = (
+        db.query(ConversationModel)
+        .filter(
+            ConversationModel.id == conversation_id,
+            ConversationModel.owner_id == owner_id,
+        )
+        .first()
+    )
+
+    if not conversation:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+    return conversation
+
 
 # =========================
 # ✅ CORS CONFIG
@@ -77,6 +117,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(ClientIdMiddleware)
 
 
 # =========================
@@ -123,13 +164,15 @@ def root():
 @app.post("/conversations", response_model=ConversationResponse)
 def create_conversation(
     req: ConversationCreateRequest,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    owner_id: str = Depends(get_owner_id),
 ):
     """Create a new conversation."""
     conversation_id = str(uuid4())
     conversation = ConversationModel(
         id=conversation_id,
-        title=req.title
+        title=req.title,
+        owner_id=owner_id,
     )
     db.add(conversation)
     db.commit()
@@ -138,54 +181,50 @@ def create_conversation(
 
 
 @app.get("/conversations", response_model=list[ConversationListResponse])
-def list_conversations(db: Session = Depends(get_db)):
-    """List all conversations (sorted by most recent first)."""
-    conversations = db.query(ConversationModel).order_by(
-        ConversationModel.updated_at.desc()
-    ).all()
+def list_conversations(
+    db: Session = Depends(get_db),
+    owner_id: str = Depends(get_owner_id),
+):
+    """List conversations for the current client."""
+    conversations = (
+        db.query(ConversationModel)
+        .filter(ConversationModel.owner_id == owner_id)
+        .order_by(ConversationModel.updated_at.desc())
+        .all()
+    )
     return conversations
 
 
 @app.get("/conversations/{conversation_id}", response_model=ConversationResponse)
 def get_conversation(
     conversation_id: str,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    owner_id: str = Depends(get_owner_id),
 ):
     """Get a single conversation with all its messages."""
-    conversation = db.query(ConversationModel).filter(
-        ConversationModel.id == conversation_id
-    ).first()
-    
-    if not conversation:
-        raise HTTPException(status_code=404, detail="Conversation not found")
-    
-    return conversation
+    return get_owned_conversation(conversation_id, owner_id, db)
 
 
 @app.post("/conversations/{conversation_id}/messages", response_model=MessageResponse)
 def append_message(
     conversation_id: str,
     req: MessageAppendRequest,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    owner_id: str = Depends(get_owner_id),
 ):
     """Append a message to a conversation."""
-    conversation = db.query(ConversationModel).filter(
-        ConversationModel.id == conversation_id
-    ).first()
-    
-    if not conversation:
-        raise HTTPException(status_code=404, detail="Conversation not found")
-    
+    conversation = get_owned_conversation(conversation_id, owner_id, db)
+
     message = MessageModel(
         id=str(uuid4()),
-        conversation_id=conversation_id,
+        conversation_id=conversation.id,
         role=req.role,
-        content=req.content
+        content=req.content,
     )
     db.add(message)
     db.commit()
     db.refresh(message)
-    
+
     return message
 
 
@@ -193,41 +232,33 @@ def append_message(
 def update_conversation(
     conversation_id: str,
     req: ConversationUpdateRequest,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    owner_id: str = Depends(get_owner_id),
 ):
     """Update conversation metadata (title)."""
-    conversation = db.query(ConversationModel).filter(
-        ConversationModel.id == conversation_id
-    ).first()
-    
-    if not conversation:
-        raise HTTPException(status_code=404, detail="Conversation not found")
-    
+    conversation = get_owned_conversation(conversation_id, owner_id, db)
+
     if req.title is not None:
         conversation.title = req.title
-    
+
     db.commit()
     db.refresh(conversation)
-    
+
     return conversation
 
 
 @app.delete("/conversations/{conversation_id}")
 def delete_conversation(
     conversation_id: str,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    owner_id: str = Depends(get_owner_id),
 ):
     """Delete a conversation and all its messages."""
-    conversation = db.query(ConversationModel).filter(
-        ConversationModel.id == conversation_id
-    ).first()
-    
-    if not conversation:
-        raise HTTPException(status_code=404, detail="Conversation not found")
-    
+    conversation = get_owned_conversation(conversation_id, owner_id, db)
+
     db.delete(conversation)
     db.commit()
-    
+
     return {"status": "deleted", "conversation_id": conversation_id}
 
 
@@ -238,14 +269,11 @@ def delete_conversation(
 @app.post("/chat")
 def chat_endpoint(req: ChatRequest, db: Session = Depends(get_db)):
     """
-    Stream AI response using SSE.
-    
-    Optionally persists the request to a conversation if conversation_id is provided.
-    Preserves full streaming safety and lifecycle.
+    Stream AI response using SSE via OpenRouter.
+    Message persistence is handled by the frontend after stream finalize.
     """
     raw_messages = req.messages
     selected_model = req.model or OPENROUTER_MODEL
-    conversation_id = req.conversation_id
 
     # System prompt
     system_prompt = {

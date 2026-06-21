@@ -6,7 +6,7 @@ import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
 
 const MAX_HIGHLIGHT_CHARS = 12000;
 
-const markdownComponents = {
+const buildMarkdownComponents = (forcePlainCodeBlocks) => ({
   p: ({ children }) => (
     <p className="my-3 leading-7 text-slate-100 first:mt-0 last:mb-0">{children}</p>
   ),
@@ -53,7 +53,7 @@ const markdownComponents = {
     const isBlock = Boolean(match) || codeText.includes("\n");
 
     if (isBlock) {
-      if (codeText.length > MAX_HIGHLIGHT_CHARS) {
+      if (forcePlainCodeBlocks || codeText.length > MAX_HIGHLIGHT_CHARS) {
         return (
           <div className="my-4 overflow-hidden rounded-xl border border-slate-700/70 bg-slate-950/90 shadow-[0_0_0_1px_rgba(148,163,184,0.08),0_10px_30px_rgba(2,6,23,0.45)]">
             <pre className="max-h-[36rem] overflow-auto px-4 py-3 text-[0.86rem] leading-[1.55rem] text-slate-100">
@@ -132,7 +132,7 @@ const markdownComponents = {
     }
     return null;
   },
-};
+});
 
 const MessageBubble = ({
   message,
@@ -142,6 +142,7 @@ const MessageBubble = ({
   totalVersions = 1,
   onPrev,
   onNext,
+  hasLargeCodeBlock = false,
 }) => {
   const [copied, setCopied] = useState(false);
 
@@ -161,12 +162,13 @@ const MessageBubble = ({
 
   const finalizedMarkdown = useMemo(() => {
     if (!message || isUser || isStreaming) return null;
+    const components = buildMarkdownComponents(hasLargeCodeBlock);
     return (
-      <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+      <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
         {messageContent}
       </ReactMarkdown>
     );
-  }, [isStreaming, isUser, message, messageContent]);
+  }, [hasLargeCodeBlock, isStreaming, isUser, message, messageContent]);
 
   if (!message) return null;
 
@@ -282,6 +284,7 @@ const areBubblePropsEqual = (prevProps, nextProps) => {
   if (prevMessage !== nextMessage) return false;
   if (prevProps.versionIndex !== nextProps.versionIndex) return false;
   if (prevProps.totalVersions !== nextProps.totalVersions) return false;
+  if (prevProps.hasLargeCodeBlock !== nextProps.hasLargeCodeBlock) return false;
   if (Boolean(prevProps.onRegenerate) !== Boolean(nextProps.onRegenerate)) return false;
   if (Boolean(prevProps.onEdit) !== Boolean(nextProps.onEdit)) return false;
   return true;
