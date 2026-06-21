@@ -7,6 +7,7 @@ import { useModelSelection } from "../hooks/useModelSelection";
 import { getModel } from "../config/models";
 import { useMarkdownProcessor } from "../utils/markdownProcessor";
 import { createStreamSessionId, isActiveStreamSession as checkActiveStreamSession } from "../utils/streamSession";
+import { buildChatApiMessages } from "../utils/chatApiMessages";
 import AppLogo from "./AppLogo";
 import { Sparkles, Code2, FileText, Bug } from "lucide-react";
 
@@ -34,6 +35,7 @@ const IS_DEV = import.meta.env.DEV;
 
 const generateMessageId = () =>
   "msg_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8);
+const STREAM_ERROR_MESSAGE = "Something went wrong. Please try again.";
 const STREAM_STATUS = Object.freeze({
   IDLE: "idle",
   STARTING: "starting",
@@ -471,7 +473,7 @@ const ChatWindow = ({
       ]);
 
       const finalText = await streamAIResponse(
-        updatedMessages,
+        buildChatApiMessages(updatedMessages, activeVersionMap),
         (incomingText) => {
           if (!isActiveStreamSession(requestId, streamSessionId)) {
             devInvariant("stale-write-send", "Ignored stale token write in send flow", {
@@ -501,6 +503,24 @@ const ChatWindow = ({
         devInvariant("stale-finalize-send", "Skipped finalize for stale send session", {
           requestId,
           sessionId: streamSessionId,
+        });
+        return;
+      }
+
+      if (!String(finalText ?? "").trim()) {
+        transitionToStatus(STREAM_STATUS.ERROR);
+        terminalStatus = STREAM_STATUS.ERROR;
+        setMessages((prev) => {
+          const updated = [...prev];
+          const last = updated[updated.length - 1];
+          if (last?.role === "assistant") {
+            updated[updated.length - 1] = {
+              ...last,
+              content: STREAM_ERROR_MESSAGE,
+              isStreaming: false,
+            };
+          }
+          return updated;
         });
         return;
       }
@@ -550,7 +570,7 @@ const ChatWindow = ({
         if (last?.role === "assistant" && last.isStreaming) {
           updated[updated.length - 1] = {
             ...last,
-            content: "Something went wrong. Please try again.",
+            content: STREAM_ERROR_MESSAGE,
             isStreaming: false,
           };
           return updated;
@@ -561,7 +581,7 @@ const ChatWindow = ({
           {
             id: generateMessageId(),
             role: "assistant",
-            content: "Something went wrong. Please try again.",
+            content: STREAM_ERROR_MESSAGE,
             isStreaming: false,
             parentId: updatedMessages[updatedMessages.length - 1]?.id || null,
           },
@@ -658,7 +678,7 @@ const ChatWindow = ({
       }));
 
       const finalText = await streamAIResponse(
-        baseMessages,
+        buildChatApiMessages(baseMessages, activeVersionMap, { excludeLastAssistantTurn: true }),
         (incomingText) => {
           if (!isActiveStreamSession(requestId, streamSessionId)) {
             devInvariant("stale-write-regen", "Ignored stale token write in regenerate flow", {
@@ -687,6 +707,24 @@ const ChatWindow = ({
         devInvariant("stale-finalize-regen", "Skipped finalize for stale regenerate session", {
           requestId,
           sessionId: streamSessionId,
+        });
+        return;
+      }
+
+      if (!String(finalText ?? "").trim()) {
+        transitionToStatus(STREAM_STATUS.ERROR);
+        terminalStatus = STREAM_STATUS.ERROR;
+        setMessages((prev) => {
+          const updated = [...prev];
+          const last = updated[updated.length - 1];
+          if (last?.role === "assistant") {
+            updated[updated.length - 1] = {
+              ...last,
+              content: STREAM_ERROR_MESSAGE,
+              isStreaming: false,
+            };
+          }
+          return updated;
         });
         return;
       }
@@ -730,6 +768,18 @@ const ChatWindow = ({
         }
         transitionToStatus(STREAM_STATUS.ERROR);
         terminalStatus = STREAM_STATUS.ERROR;
+        setMessages((prev) => {
+          const updated = [...prev];
+          const last = updated[updated.length - 1];
+          if (last?.role === "assistant" && last.isStreaming) {
+            updated[updated.length - 1] = {
+              ...last,
+              content: STREAM_ERROR_MESSAGE,
+              isStreaming: false,
+            };
+          }
+          return updated;
+        });
         console.error("Regeneration failed:", err);
       }
     } finally {
